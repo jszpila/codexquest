@@ -1,0 +1,180 @@
+[gd_scene load_steps=14 format=3 uid="uid://bof05ivffmn5u"]
+
+[ext_resource type="Script" uid="uid://s5pbhuqwkwq4" path="res://scripts/Main.gd" id="1"]
+[ext_resource type="TileSet" uid="uid://tayrg5g1nh5u" path="res://tiles/Sprites.tileset.tres" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="3"]
+[ext_resource type="Script" uid="uid://chd0omw48s33h" path="res://scripts/PixelScaler.gd" id="4"]
+[ext_resource type="Texture2D" uid="uid://ojsa1cwutvr1" path="res://key-1.png" id="5"]
+[ext_resource type="Texture2D" uid="uid://csnbp36r32qkp" path="res://goblin-1.png" id="6"]
+[ext_resource type="Texture2D" uid="uid://svvp3seutjkw" path="res://codex-quest-title.png" id="7"]
+[ext_resource type="Texture2D" uid="uid://c2rxob573x2am" path="res://codex-quest-win.png" id="8"]
+[ext_resource type="Texture2D" uid="uid://l3gvmh8f4b6k" path="res://codex-quest-lose.png" id="9"]
+[ext_resource type="Texture2D" uid="uid://dtpwpu3mi80fi" path="res://sword.png" id="10"]
+[ext_resource type="Texture2D" uid="uid://dr7hgynepi5no" path="res://shield.png" id="11"]
+[ext_resource type="Texture2D" uid="uid://clc2i6vyqn6km" path="res://potion.png" id="12"]
+[ext_resource type="Texture2D" uid="uid://rmqo6tntxmhq" path="res://codex.png" id="13"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Floor" type="TileMap" parent="."]
+tile_set = ExtResource("2")
+format = 2
+
+[node name="Decor" type="Node2D" parent="."]
+
+[node name="Walls" type="TileMap" parent="."]
+tile_set = ExtResource("2")
+format = 2
+
+[node name="Door" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Door"]
+centered = false
+
+[node name="Player" parent="." instance=ExtResource("3")]
+
+[node name="PixelScaler" type="Node" parent="."]
+script = ExtResource("4")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Hearts" type="HBoxContainer" parent="HUD"]
+offset_left = 8.0
+offset_top = 8.0
+
+[node name="HUDKeyIcon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 8.0
+offset_top = 32.0
+texture = ExtResource("5")
+
+[node name="HUDSwordIcon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 36.0
+offset_top = 32.0
+texture = ExtResource("10")
+
+[node name="HUDShieldIcon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 64.0
+offset_top = 32.0
+texture = ExtResource("11")
+
+[node name="HUDCodexIcon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 92.0
+offset_top = 32.0
+texture = ExtResource("13")
+
+[node name="Fade" type="ColorRect" parent="HUD"]
+z_index = 100
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0)
+
+[node name="Title" type="CanvasLayer" parent="."]
+
+[node name="TitleBG" type="TextureRect" parent="Title"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("7")
+stretch_mode = 6
+
+[node name="TitleLabel" type="Label" parent="Title"]
+z_index = 200
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Press Enter to start"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GameOver" type="CanvasLayer" parent="."]
+
+[node name="OverBGWin" type="TextureRect" parent="GameOver"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("8")
+stretch_mode = 6
+
+[node name="OverBGLose" type="TextureRect" parent="GameOver"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("9")
+stretch_mode = 6
+
+[node name="OverLabel" type="Label" parent="GameOver"]
+z_index = 200
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Press Enter to restart"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Key" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Key"]
+texture = ExtResource("5")
+centered = false
+
+[node name="Sword" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Sword"]
+texture = ExtResource("10")
+centered = false
+
+[node name="Shield" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Shield"]
+texture = ExtResource("11")
+centered = false
+
+[node name="Potion" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Potion"]
+texture = ExtResource("12")
+centered = false
+
+[node name="Codex" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Codex"]
+texture = ExtResource("13")
+centered = false
+
+[node name="Goblin" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Goblin"]
+texture = ExtResource("6")
+centered = false
