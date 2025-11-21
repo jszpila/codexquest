@@ -17,3 +17,6 @@ mono_crash.*.json
 **/.DS_Store
 **/._.DS_Store
 dist/
+
+# Credentials
+.web

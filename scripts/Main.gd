@@ -945,6 +945,7 @@ func _start_game() -> void:
 	_torch_target_level = _rng.randi_range(1, 2)
 	_score = 0
 	_last_trap_cell = Vector2i(-1, -1)
+	_update_hud_icons()
 	_clear_enemies()
 	# Build board fresh
 	floor_map.clear()
@@ -1286,6 +1287,14 @@ func _place_door(grid_size: Vector2i) -> void:
 					reachable = true
 					break
 			if reachable:
+				# Avoid placing where decorative door (door-3) already exists
+				var existing := false
+				for child in _decor.get_children():
+					if child is Sprite2D and (child as Sprite2D).texture == DOOR_TEX_3 and Grid.world_to_cell(child.global_position) == c:
+						existing = true
+						break
+				if existing:
+					continue
 				_door_cell = c
 				found = true
 	if not found:
@@ -1399,11 +1408,15 @@ func _update_hud_icons() -> void:
 		_hud_icon_rune2.visible = show and _rune2_collected
 	if _hud_icon_torch:
 		_hud_icon_torch.visible = show and _torch_collected
+	var score_label := get_node_or_null("HUD/HUDScore") as Label
+	if score_label:
+		score_label.visible = show
+		score_label.text = "Score: %d" % _score
 
 func _apply_trap_damage() -> void:
 	if _game_over:
 		return
-	_hp_current -= 1
+	_hp_current = max(0, _hp_current - 1)
 	_update_hud_hearts()
 	_play_sfx(SFX_HURT2)
 	_blink_node(player)
