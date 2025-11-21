@@ -818,6 +818,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 func _place_entrance_marker(start_cell: Vector2i) -> void:
 	# Find a wall adjacent to the start cell and place a decorative door sprite there.
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+	dirs.shuffle()
 	var wall_cell := Vector2i(-1, -1)
 	for d in dirs:
 		var n := start_cell + d
@@ -1128,8 +1129,10 @@ func _place_player(cell: Vector2i) -> void:
 	else:
 		player.global_position = Grid.cell_to_world(cell)
 
+
 func _pick_free_cell_next_to_wall(grid_size: Vector2i) -> Vector2i:
-	# Prefer cells that are free and adjacent to a wall for a snug start position
+	# Prefer cells that are free and adjacent to a wall, but pick randomly from all candidates
+	var pool: Array[Vector2i] = []
 	for y in range(1, grid_size.y - 1):
 		for x in range(1, grid_size.x - 1):
 			var c := Vector2i(x, y)
@@ -1138,7 +1141,10 @@ func _pick_free_cell_next_to_wall(grid_size: Vector2i) -> Vector2i:
 			var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 			for d in dirs:
 				if _is_wall(c + d):
-					return c
+					pool.append(c)
+					break
+	if pool.size() > 0:
+		return pool[_rng.randi_range(0, pool.size() - 1)]
 	# Fallback to center if none found (shouldn't happen)
 	return Vector2i(int(grid_size.x / 2), int(grid_size.y / 2))
 
