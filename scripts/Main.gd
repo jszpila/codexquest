@@ -49,6 +49,7 @@ const SIGHT_MAX_DARK := 0.8
 @onready var _hud_icon_codex: TextureRect = $HUD/HUDCodexIcon
 @onready var _hud_icon_rune1: TextureRect = $HUD/HUDRune1Icon
 @onready var _hud_icon_rune2: TextureRect = $HUD/HUDRune2Icon
+@onready var _hud_icon_torch: TextureRect = $HUD/HUDTorchIcon
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Node2D = $Key
 @onready var _sword_node: Node2D = $Sword
@@ -61,6 +62,7 @@ const SIGHT_MAX_DARK := 0.8
 @onready var _title_label: Label = $Title/TitleLabel
 @onready var _over_layer: CanvasLayer = $GameOver
 @onready var _over_label: Label = $GameOver/OverLabel
+@onready var _over_score: Label = $GameOver/OverScore
 @onready var _title_bg: TextureRect = $Title/TitleBG
 @onready var _over_bg_win: TextureRect = $GameOver/OverBGWin
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
@@ -78,6 +80,7 @@ var _potion_cell: Vector2i = Vector2i.ZERO
 var _potion2_cell: Vector2i = Vector2i.ZERO
 var _rune1_cell: Vector2i = Vector2i.ZERO
 var _rune2_cell: Vector2i = Vector2i.ZERO
+var _torch_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
 var _key_collected: bool = false
 var _sword_collected: bool = false
@@ -86,10 +89,12 @@ var _potion_collected: bool = false
 var _potion2_collected: bool = false
 var _rune1_collected: bool = false
 var _rune2_collected: bool = false
+var _torch_collected: bool = false
 var _codex_collected: bool = false
 var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
 var _won: bool = false
+var _score: int = 0
 var _goblin_nodes: Array[Node2D] = []
 var _goblin_cells: Array[Vector2i] = []
 var _goblin_alive: Array[bool] = []
@@ -104,6 +109,7 @@ var _minotaur_hp: Array[int] = []
 var _potion2_node: Node2D
 var _rune1_node: Node2D
 var _rune2_node: Node2D
+var _torch_node: Node2D
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
@@ -111,6 +117,7 @@ var _door_is_open: bool = false
 var _level: int = 1
 var _crown_collected: bool = false
 var _is_transitioning: bool = false
+var _torch_target_level: int = 1
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -157,6 +164,7 @@ func _process(_delta: float) -> void:
 		print("GOT KEY")
 		if _key_node:
 			_key_node.visible = false
+		_score += 1
 		_update_door_texture()
 		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
@@ -167,11 +175,12 @@ func _process(_delta: float) -> void:
 		print("GOT SWORD")
 		if _sword_node:
 			_sword_node.visible = false
-		_update_player_sprite_appearance()
-		_update_hud_icons()
-		_play_sfx(SFX_PICKUP1)
-		_blink_node(player)
-		# Potions (supports two on level 2+); only pick up if below max HP
+			_score += 1
+			_update_player_sprite_appearance()
+			_update_hud_icons()
+			_play_sfx(SFX_PICKUP1)
+			_blink_node(player)
+	# Potions (supports two on level 2+); only pick up if below max HP
 		var consumed := false
 		if cp == _potion_cell and not _potion_collected:
 			if _hp_current < _hp_max:
@@ -204,6 +213,7 @@ func _process(_delta: float) -> void:
 			print("GOT CODEX")
 			if _codex_node:
 				_codex_node.visible = false
+			_score += 1
 			_update_hud_icons()
 			_update_door_texture()
 			_play_sfx(SFX_PICKUP2)
@@ -215,6 +225,7 @@ func _process(_delta: float) -> void:
 			print("GOT CROWN")
 			if _codex_node:
 				_codex_node.visible = false
+			_score += 1
 			_update_hud_icons()
 			_update_door_texture()
 			_play_sfx(SFX_PICKUP2)
@@ -224,10 +235,22 @@ func _process(_delta: float) -> void:
 		print("GOT SHIELD")
 		if _shield_node:
 			_shield_node.visible = false
-		_update_player_sprite_appearance()
+			_score += 1
+			_update_player_sprite_appearance()
+			_update_hud_icons()
+			_play_sfx(SFX_PICKUP1)
+			_blink_node(player)
+	# Torch pickup: extends FOV by +4 for the rest of the run
+	if not _torch_collected and cp == _torch_cell:
+		_torch_collected = true
+		print("GOT TORCH (+4 SIGHT)")
+		if _torch_node:
+			_torch_node.visible = false
 		_update_hud_icons()
-		_play_sfx(SFX_PICKUP1)
+		_update_fov()
+		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_score += 1
 
 	if not _game_over:
 		for i in range(_goblin_cells.size()):
@@ -253,6 +276,7 @@ func _process(_delta: float) -> void:
 		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_score += 1
 	if not _rune2_collected and cp == _rune2_cell:
 		_rune2_collected = true
 		print("GOT RUNE-2 (+1 DEF)")
@@ -261,6 +285,7 @@ func _process(_delta: float) -> void:
 		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_score += 1
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -545,6 +570,30 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		else:
 			if _rune2_node:
 				_rune2_node.visible = false
+	# Torch placement: only once per run, on either L1 or L2
+	if not _torch_collected and _level == _torch_target_level:
+		var tex := _try_load_tex("res://assets/torch.png")
+		if tex != null:
+			var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
+			if _level >= 2:
+				exclude2.append(_potion2_cell)
+			if _rune1_cell != Vector2i.ZERO:
+				exclude2.append(_rune1_cell)
+			if _rune2_cell != Vector2i.ZERO:
+				exclude2.append(_rune2_cell)
+			_torch_cell = _pick_free_interior_cell(grid_size, exclude2)
+			if _torch_node == null:
+				_torch_node = Node2D.new()
+				_torch_node.name = "Torch"
+				var s3 := Sprite2D.new()
+				s3.centered = false
+				s3.texture = tex
+				s3.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				s3.z_index = 1
+				_torch_node.add_child(s3)
+				add_child(_torch_node)
+			_torch_node.global_position = Grid.cell_to_world(_torch_cell)
+			_torch_node.visible = true
 	else:
 		# Hide runes entirely on level 1
 		if _rune1_node:
@@ -628,6 +677,8 @@ func _restart_game() -> void:
 	_codex_collected = false
 	_hp_current = _hp_max
 	_level = 1
+	_torch_collected = false
+	_torch_target_level = _rng.randi_range(1, 2)
 	_goblin_nodes.clear()
 	_goblin_cells.clear()
 	_goblin_alive.clear()
@@ -701,6 +752,7 @@ func _resolve_combat(gidx: int) -> void:
 			_goblin_nodes[gidx].visible = false
 			_leave_goblin_corpse(_goblin_cells[gidx])
 			_play_sfx(SFX_HURT3)
+			_score += 1
 			_check_win()
 			break
 
@@ -727,6 +779,7 @@ func _combat_round(gidx: int) -> void:
 		_goblin_nodes[gidx].visible = false
 		_leave_goblin_corpse(_goblin_cells[gidx])
 		_play_sfx(SFX_HURT3)
+		_score += 1
 		_check_win()
 	else:
 		_hp_current -= 1
@@ -765,6 +818,7 @@ func _combat_round_zombie(zidx: int) -> void:
 			_zombie_nodes[zidx].visible = false
 			_leave_zombie_corpse(_zombie_cells[zidx])
 			_play_sfx(SFX_HURT3)
+			_score += 1
 	else:
 		_hp_current -= 1
 		print("Player loses 1 HP. HP now:", _hp_current)
@@ -802,6 +856,7 @@ func _combat_round_minotaur(midx: int) -> void:
 			_minotaur_nodes[midx].visible = false
 			_leave_minotaur_corpse(_minotaur_cells[midx])
 			_play_sfx(SFX_HURT3)
+			_score += 1
 	else:
 		_hp_current -= 1
 		print("Player loses 1 HP. HP now:", _hp_current)
@@ -855,7 +910,10 @@ func _start_game() -> void:
 	_potion2_collected = false
 	_sword_collected = false
 	_shield_collected = false
+	_torch_collected = false
 	_hp_current = _hp_max
+	_torch_target_level = _rng.randi_range(1, 2)
+	_score = 0
 	_goblin_nodes.clear()
 	_goblin_cells.clear()
 	_goblin_alive.clear()
@@ -898,6 +956,10 @@ func _show_game_over(won: bool) -> void:
 	_over_bg_lose.visible = not won
 	_over_label.add_theme_font_size_override("font_size", 48)
 	_over_label.text = "Press Enter to restart"
+	if _over_score:
+		_over_score.add_theme_font_size_override("font_size", 36)
+		_over_score.offset_top = -124.0
+		_over_score.text = "Score: %d" % _score
 
 func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible
@@ -915,6 +977,8 @@ func _set_world_visible(visible: bool) -> void:
 		_potion_node.visible = visible and not _potion_collected
 	if _potion2_node:
 		_potion2_node.visible = visible and _level >= 2 and not _potion2_collected
+	if _torch_node:
+		_torch_node.visible = visible and not _torch_collected and _level == _torch_target_level
 	if _codex_node:
 			# Only show special item if not collected for the current level
 			var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
@@ -968,7 +1032,8 @@ func _update_fov() -> void:
 		_fov_visible[i] = false
 		_fov_dist[i] = 1e9
 	var center: Vector2i = Grid.world_to_cell(player.global_position)
-	var radius: int = SIGHT_OUTER_TILES
+	var bonus: int = (4 if _torch_collected else 0)
+	var radius: int = SIGHT_OUTER_TILES + bonus
 	if _in_bounds(center):
 		var center_idx: int = center.y * _grid_size.x + center.x
 		_fov_visible[center_idx] = true
@@ -994,7 +1059,7 @@ func _update_fov() -> void:
 				if _is_wall(p) and p != center:
 					break
 	if _fov_overlay:
-		(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES, SIGHT_OUTER_TILES, SIGHT_MAX_DARK)
+		(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES + bonus, SIGHT_OUTER_TILES + bonus, SIGHT_MAX_DARK)
 
 func _in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < _grid_size.x and cell.y < _grid_size.y
@@ -1264,6 +1329,8 @@ func _update_hud_icons() -> void:
 		_hud_icon_rune1.visible = show and _rune1_collected
 	if _hud_icon_rune2:
 		_hud_icon_rune2.visible = show and _rune2_collected
+	if _hud_icon_torch:
+		_hud_icon_torch.visible = show and _torch_collected
 
 func _update_hud_hearts() -> void:
 	if _hud_hearts == null:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://bof05ivffmn5u"]
+[gd_scene load_steps=17 format=3 uid="uid://bof05ivffmn5u"]
 
 [ext_resource type="Script" uid="uid://s5pbhuqwkwq4" path="res://scripts/Main.gd" id="1"]
 [ext_resource type="TileSet" uid="uid://tayrg5g1nh5u" path="res://tiles/Sprites.tileset.tres" id="2"]
@@ -13,8 +13,9 @@
 [ext_resource type="Texture2D" uid="uid://dr7hgynepi5no" path="res://assets/shield.png" id="11"]
 [ext_resource type="Texture2D" uid="uid://clc2i6vyqn6km" path="res://assets/potion.png" id="12"]
 [ext_resource type="Texture2D" uid="uid://rmqo6tntxmhq" path="res://assets/codex.png" id="13"]
-[ext_resource type="Texture2D" path="res://assets/rune-1.png" id="14"]
-[ext_resource type="Texture2D" path="res://assets/rune-2.png" id="15"]
+[ext_resource type="Texture2D" uid="uid://b0g7h3ud5uan4" path="res://assets/rune-1.png" id="14"]
+[ext_resource type="Texture2D" uid="uid://d2misqo66cl05" path="res://assets/rune-2.png" id="15"]
+[ext_resource type="Texture2D" uid="uid://bwwml4mqltpf3" path="res://assets/torch.png" id="16"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -95,6 +96,13 @@ offset_left = 148.0
 offset_top = 32.0
 texture = ExtResource("15")
 
+[node name="HUDTorchIcon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 176.0
+offset_top = 32.0
+texture = ExtResource("16")
+
 [node name="Fade" type="ColorRect" parent="HUD"]
 z_index = 100
 anchors_preset = 15
@@ -156,6 +164,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 text = "Press Enter to restart"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OverScore" type="Label" parent="GameOver"]
+z_index = 200
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Score: 0"
 horizontal_alignment = 1
 vertical_alignment = 1
 
