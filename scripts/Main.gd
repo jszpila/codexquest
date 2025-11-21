@@ -16,6 +16,7 @@ const BONE_TEXTURES: Array[Texture2D] = [
 ]
 const DOOR_TEX_1: Texture2D = preload("res://assets/door-1.png")
 const DOOR_TEX_2: Texture2D = preload("res://assets/door-2.png")
+const DOOR_TEX_3: Texture2D = preload("res://assets/door-3.png")
 const PLAYER_TEX_1: Texture2D = preload("res://assets/player-1.png")
 const PLAYER_TEX_2: Texture2D = preload("res://assets/player-2.png")
 const PLAYER_TEX_3: Texture2D = preload("res://assets/player-3.png")
@@ -68,11 +69,13 @@ var _key_cell: Vector2i = Vector2i.ZERO
 var _sword_cell: Vector2i = Vector2i.ZERO
 var _shield_cell: Vector2i = Vector2i.ZERO
 var _potion_cell: Vector2i = Vector2i.ZERO
+var _potion2_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
 var _key_collected: bool = false
 var _sword_collected: bool = false
 var _shield_collected: bool = false
 var _potion_collected: bool = false
+var _potion2_collected: bool = false
 var _codex_collected: bool = false
 var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
@@ -80,10 +83,14 @@ var _won: bool = false
 var _goblin_nodes: Array[Node2D] = []
 var _goblin_cells: Array[Vector2i] = []
 var _goblin_alive: Array[bool] = []
+var _potion2_node: Node2D
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
 var _door_is_open: bool = false
+var _level: int = 1
+var _crown_collected: bool = false
+var _is_transitioning: bool = false
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -144,25 +151,54 @@ func _process(_delta: float) -> void:
 		_update_hud_icons()
 		_play_sfx(SFX_PICKUP1)
 		_blink_node(player)
-	if not _potion_collected and _hp_current < _hp_max and cp == _potion_cell:
-		_potion_collected = true
-		_hp_current = min(_hp_max, _hp_current + 1)
-		print("GOT POTION (+1 HP)")
-		if _potion_node:
-			_potion_node.visible = false
-		_update_hud_hearts()
-		_play_sfx(SFX_PICKUP1)
-		_blink_node(player)
-	if not _codex_collected and cp == _codex_cell:
-		_codex_collected = true
-		print("GOT CODEX")
-		if _codex_node:
-			_codex_node.visible = false
-		_update_hud_icons()
-		_update_door_texture()
-		_play_sfx(SFX_PICKUP2)
-		_blink_node(player)
-		_check_win()
+		# Potions (supports two on level 2+); only pick up if below max HP
+		var consumed := false
+		if cp == _potion_cell and not _potion_collected:
+			if _hp_current < _hp_max:
+				print("[DEBUG] On potion1 cell. hp=", _hp_current, "/", _hp_max)
+				_potion_collected = true
+				if _potion_node:
+					_potion_node.visible = false
+				consumed = true
+			else:
+				print("[DEBUG] On potion1 but at max HP; not consuming")
+		elif _level >= 2 and cp == _potion2_cell and not _potion2_collected:
+			if _hp_current < _hp_max:
+				print("[DEBUG] On potion2 cell. hp=", _hp_current, "/", _hp_max)
+				_potion2_collected = true
+				if _potion2_node:
+					_potion2_node.visible = false
+				consumed = true
+			else:
+				print("[DEBUG] On potion2 but at max HP; not consuming")
+		if consumed:
+			_hp_current = min(_hp_max, _hp_current + 1)
+			print("GOT POTION (+1 HP)")
+			_update_hud_hearts()
+			_play_sfx(SFX_PICKUP1)
+			_blink_node(player)
+	# Level-specific special pickup (codex on L1, crown on L2)
+	if _level == 1:
+		if not _codex_collected and cp == _codex_cell:
+			_codex_collected = true
+			print("GOT CODEX")
+			if _codex_node:
+				_codex_node.visible = false
+			_update_hud_icons()
+			_update_door_texture()
+			_play_sfx(SFX_PICKUP2)
+			_blink_node(player)
+			_check_win()
+	else:
+		if not _crown_collected and cp == _codex_cell:
+			_crown_collected = true
+			print("GOT CROWN")
+			if _codex_node:
+				_codex_node.visible = false
+			_update_hud_icons()
+			_update_door_texture()
+			_play_sfx(SFX_PICKUP2)
+			_blink_node(player)
 	if not _shield_collected and cp == _shield_cell:
 		_shield_collected = true
 		print("GOT SHIELD")
@@ -186,6 +222,8 @@ func _process(_delta: float) -> void:
 
 func _on_player_moved(new_cell: Vector2i) -> void:
 	# 75% chance each goblin attempts to move 1 step in a random dir
+	print("[DEBUG] moved=", new_cell, " potion1=", _potion_cell, " p1col=", _potion_collected, 
+		" potion2=", _potion2_cell, " p2col=", _potion2_collected)
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for i in range(_goblin_cells.size()):
 		if _goblin_alive.size() <= i or not _goblin_alive[i]:
@@ -194,6 +232,31 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_goblin(i, d)
 	_update_fov()
+	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
+	if not _potion_collected and new_cell == _potion_cell:
+		if _hp_current < _hp_max:
+			print("[DEBUG] On potion1 cell via moved. hp=", _hp_current, "/", _hp_max)
+			_potion_collected = true
+			if _potion_node:
+				_potion_node.visible = false
+			_hp_current = min(_hp_max, _hp_current + 1)
+			_update_hud_hearts()
+			_play_sfx(SFX_PICKUP1)
+			_blink_node(player)
+		else:
+			print("[DEBUG] On potion1 via moved but at max HP; not consuming")
+	elif _level >= 2 and not _potion2_collected and new_cell == _potion2_cell:
+		if _hp_current < _hp_max:
+			print("[DEBUG] On potion2 cell via moved. hp=", _hp_current, "/", _hp_max)
+			_potion2_collected = true
+			if _potion2_node:
+				_potion2_node.visible = false
+			_hp_current = min(_hp_max, _hp_current + 1)
+			_update_hud_hearts()
+			_play_sfx(SFX_PICKUP1)
+			_blink_node(player)
+		else:
+			print("[DEBUG] On potion2 via moved but at max HP; not consuming")
 
 func _move_goblin(index: int, dir: Vector2i) -> void:
 	var dest := _goblin_cells[index] + dir
@@ -298,21 +361,46 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	if _key_node:
 		_key_node.global_position = Grid.cell_to_world(_key_cell)
 	# Place sword
-	_sword_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell])
-	if _sword_node:
-		_sword_node.global_position = Grid.cell_to_world(_sword_cell)
+	if not _sword_collected:
+		_sword_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell])
+		if _sword_node:
+			_sword_node.global_position = Grid.cell_to_world(_sword_cell)
+	elif _sword_node:
+		_sword_node.visible = false
 	# Place shield
-	_shield_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell])
-	if _shield_node:
-		_shield_node.global_position = Grid.cell_to_world(_shield_cell)
-	# Place potion
+	if not _shield_collected:
+		_shield_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell])
+		if _shield_node:
+			_shield_node.global_position = Grid.cell_to_world(_shield_cell)
+	elif _shield_node:
+		_shield_node.visible = false
+	# Place potion(s)
 	_potion_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell])
 	if _potion_node:
 		_potion_node.global_position = Grid.cell_to_world(_potion_cell)
-	# Place codex
-	_codex_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell])
+	# On level 2+, add a second potion at a distinct free cell
+	if _level >= 2:
+		var exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
+		_potion2_cell = _pick_free_interior_cell(grid_size, exclude)
+		if _potion2_node == null and _potion_node != null:
+			_potion2_node = _potion_node.duplicate()
+			_potion2_node.name = "PotionExtra"
+			add_child(_potion2_node)
+		if _potion2_node != null:
+			_potion2_node.global_position = Grid.cell_to_world(_potion2_cell)
+			_potion2_node.visible = true
+	# Place codex (or crown on L2) avoiding potions
+	var codex_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
+	if _level >= 2:
+		codex_exclude.append(_potion2_cell)
+	_codex_cell = _pick_free_interior_cell(grid_size, codex_exclude)
 	if _codex_node:
 		_codex_node.global_position = Grid.cell_to_world(_codex_cell)
+	# Debug placement dump
+	print("[DEBUG] L", _level, " placements:")
+	print("  key=", _key_cell, " sword=", _sword_cell, " shield=", _shield_cell)
+	print("  potion1=", _potion_cell, " potion2=", (_potion2_cell if _level >= 2 else Vector2i(-1, -1)))
+	print("  special(cell)=", _codex_cell, " collected L1? ", _codex_collected, " crown L2+? ", _crown_collected)
 	# Reset goblin lists and remove any existing extras
 	_clear_extra_goblins()
 	_goblin_nodes.clear()
@@ -345,6 +433,9 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 
 func _restart_game() -> void:
 	# Fade to black
+	if _is_transitioning:
+		return
+	_is_transitioning = true
 	var tw1 := get_tree().create_tween()
 	tw1.tween_property(_fade, "modulate:a", 1.0, 0.4)
 	await tw1.finished
@@ -354,9 +445,12 @@ func _restart_game() -> void:
 	_sword_collected = false
 	_shield_collected = false
 	_potion_collected = false
+	_potion2_collected = false
 	_codex_collected = false
+	_crown_collected = false
 	_codex_collected = false
 	_hp_current = _hp_max
+	_level = 1
 	_goblin_nodes.clear()
 	_goblin_cells.clear()
 	_goblin_alive.clear()
@@ -371,6 +465,7 @@ func _restart_game() -> void:
 	_place_player(Vector2i(int(grid_size.x / 2), int(grid_size.y / 2)))
 	_place_random_inner_walls(grid_size)
 	_place_random_entities(grid_size)
+	_set_level_item_textures()
 	_clear_bones()
 	_place_bones(grid_size)
 	_place_door(grid_size)
@@ -379,11 +474,13 @@ func _restart_game() -> void:
 	if _key_node:
 		_key_node.visible = true
 	if _sword_node:
-		_sword_node.visible = true
+		_sword_node.visible = not _sword_collected
 	if _shield_node:
-		_shield_node.visible = true
+		_shield_node.visible = not _shield_collected
 	if _potion_node:
 		_potion_node.visible = true
+	if _potion2_node:
+		_potion2_node.visible = _level >= 2
 	if _codex_node:
 		_codex_node.visible = true
 	# Re-enable player controls
@@ -401,6 +498,7 @@ func _restart_game() -> void:
 	var tw2 := get_tree().create_tween()
 	tw2.tween_property(_fade, "modulate:a", 0.0, 0.4)
 	await tw2.finished
+	_is_transitioning = false
 
 func _resolve_combat(gidx: int) -> void:
 	# Roll d20 for player and goblin until there's a winner
@@ -462,11 +560,21 @@ func _combat_round(gidx: int) -> void:
 func _check_win() -> void:
 	if _game_over:
 		return
-	if not _key_collected or not _codex_collected:
+	# Prevent re-entrant loads while transitioning
+	if _is_transitioning:
+		return
+	# Require key plus level-appropriate special item
+	var special_ok := (_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected)
+	if not _key_collected or not special_ok:
 		return
 	# Player must be standing on the door cell and the door must be open (door-2)
 	var cp := Grid.world_to_cell(player.global_position)
 	if cp == _door_cell and _door_sprite != null and _door_sprite.texture == DOOR_TEX_2:
+		if _level == 1:
+			_is_transitioning = true
+			_load_next_level()
+			return
+		# Level 2+: show win screen
 		_won = true
 		_game_over = true
 		if player.has_method("set_control_enabled"):
@@ -479,9 +587,13 @@ func _start_game() -> void:
 	_fade.modulate.a = 0.0
 	# Reset flags/state
 	_state = STATE_PLAYING
+	_is_transitioning = false
 	_game_over = false
 	_won = false
+	_level = 1
 	_key_collected = false
+	_potion_collected = false
+	_potion2_collected = false
 	_sword_collected = false
 	_shield_collected = false
 	_hp_current = _hp_max
@@ -489,6 +601,7 @@ func _start_game() -> void:
 	_goblin_cells.clear()
 	_goblin_alive.clear()
 	# Build board fresh
+	_clear_extra_goblins()
 	floor_map.clear()
 	walls_map.clear()
 	var grid_size := _get_grid_size()
@@ -498,6 +611,7 @@ func _start_game() -> void:
 	_place_player(Vector2i(int(grid_size.x / 2), int(grid_size.y / 2)))
 	_place_random_inner_walls(grid_size)
 	_place_random_entities(grid_size)
+	_set_level_item_textures()
 	_clear_bones()
 	_place_bones(grid_size)
 	_place_door(grid_size)
@@ -540,8 +654,12 @@ func _set_world_visible(visible: bool) -> void:
 		_shield_node.visible = visible and not _shield_collected
 	if _potion_node:
 		_potion_node.visible = visible and not _potion_collected
+	if _potion2_node:
+		_potion2_node.visible = visible and _level >= 2 and not _potion2_collected
 	if _codex_node:
-		_codex_node.visible = visible and not _codex_collected
+			# Only show special item if not collected for the current level
+			var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
+			_codex_node.visible = visible and special_uncollected
 	for i in range(_goblin_nodes.size()):
 		_goblin_nodes[i].visible = visible and _goblin_alive[i]
 	if _hud_hearts:
@@ -569,7 +687,7 @@ func _ensure_fov_overlay() -> void:
 	for i in range(total):
 		_fov_visible[i] = false
 		_fov_dist[i] = 1e9
-	(_fov_overlay as Node).call_deferred("set_grid", _grid_size)
+		(_fov_overlay as Node).call("set_grid", _grid_size)
 	_update_fov()
 
 func _update_fov() -> void:
@@ -697,6 +815,27 @@ func _place_bones(grid_size: Vector2i) -> void:
 			used[key] = true
 			break
 
+func _place_entrance_marker(start_cell: Vector2i) -> void:
+	# Find a wall adjacent to the start cell and place a decorative door sprite there.
+	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+	var wall_cell := Vector2i(-1, -1)
+	for d in dirs:
+		var n := start_cell + d
+		if _is_wall(n):
+			wall_cell = n
+			break
+	if wall_cell.x == -1:
+		return
+	var s := Sprite2D.new()
+	s.texture = DOOR_TEX_3
+	s.centered = false
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.global_position = Grid.cell_to_world(wall_cell)
+	# Ensure it draws above the Walls TileMap
+	s.z_as_relative = false
+	s.z_index = 10
+	_decor.add_child(s)
+
 func _place_door(grid_size: Vector2i) -> void:
 	# Find a random wall cell (border or inner wall)
 	var attempts := 0
@@ -725,14 +864,77 @@ func _place_door(grid_size: Vector2i) -> void:
 func _update_door_texture() -> void:
 	if _door_sprite == null:
 		return
-	# Door only opens when BOTH key and codex are collected
-	var open := _key_collected and _codex_collected
+	# Door opens when the level's required items are collected
+	var special_ok := (_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected)
+	var open := _key_collected and special_ok
 	_door_sprite.texture = DOOR_TEX_2 if open else DOOR_TEX_1
 	if open and not _door_is_open:
 		_play_sfx(SFX_DOOR_OPEN)
 		_door_is_open = true
 	elif not open:
 		_door_is_open = false
+
+func _load_next_level() -> void:
+	# Transition to the next level instead of ending the game
+	_is_transitioning = true
+	if player.has_method("set_control_enabled"):
+		player.set_control_enabled(false)
+	var tw := get_tree().create_tween()
+	tw.tween_property(_fade, "modulate:a", 1.0, 0.3)
+	await tw.finished
+	_level += 1
+	# Reset level-specific flags
+	_key_collected = false
+	_potion_collected = false
+	_potion2_collected = false
+	_codex_collected = false
+	_crown_collected = false
+	_door_is_open = false
+	# Clear and rebuild world
+	_clear_extra_goblins()
+	floor_map.clear()
+	walls_map.clear()
+	var grid_size := _get_grid_size()
+	_grid_size = grid_size
+	_build_test_map(grid_size)
+	_ensure_fov_overlay()
+	_place_random_inner_walls(grid_size)
+	# Start near a wall for variety and to avoid center artifacts
+	var start_cell := _pick_free_cell_next_to_wall(grid_size)
+	_place_player(start_cell)
+	# Place entities after choosing the start to avoid overlaps
+	_place_random_entities(grid_size)
+	_set_level_item_textures()
+	_clear_bones()
+	# Mark the entrance on an adjacent wall near the player's start
+	_place_entrance_marker(start_cell)
+	_place_bones(grid_size)
+	_place_door(grid_size)
+	_update_door_texture()
+	# Ensure world/entities are visible for the new level
+	if _key_node:
+		_key_node.visible = true
+	if _sword_node:
+		_sword_node.visible = not _sword_collected
+	if _shield_node:
+		_shield_node.visible = not _shield_collected
+	if _potion_node:
+		_potion_node.visible = true
+	if _potion2_node:
+		_potion2_node.visible = _level >= 2
+	if _codex_node:
+		var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
+		_codex_node.visible = special_uncollected
+	_update_hud_icons()
+	_update_hud_hearts()
+	_update_fov()
+	_set_world_visible(true)
+	var tw2 := get_tree().create_tween()
+	tw2.tween_property(_fade, "modulate:a", 0.0, 0.3)
+	await tw2.finished
+	if player.has_method("set_control_enabled"):
+		player.set_control_enabled(true)
+	_is_transitioning = false
 
 func _update_player_sprite_appearance() -> void:
 	if _player_sprite == null:
@@ -757,7 +959,7 @@ func _update_hud_icons() -> void:
 	if _hud_icon_shield:
 		_hud_icon_shield.visible = show and _shield_collected
 	if _hud_icon_codex:
-		_hud_icon_codex.visible = show and _codex_collected
+		_hud_icon_codex.visible = show and ((_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected))
 
 func _update_hud_hearts() -> void:
 	if _hud_hearts == null:
@@ -831,6 +1033,53 @@ func _play_sfx(stream: AudioStream) -> void:
 	p.finished.connect(func(): p.queue_free())
 	p.play()
 
+func _set_level_item_textures() -> void:
+	# Adjust item visuals per level; fall back gracefully if assets are missing
+	var key_tex: Texture2D
+	var special_tex: Texture2D
+	if _level == 1:
+		key_tex = _try_load_tex("res://assets/key-1.png")
+		special_tex = _try_load_tex("res://assets/codex.png")
+	else:
+		key_tex = _try_load_tex("res://assets/key-2.png", "res://assets/key-1.png")
+		special_tex = _try_load_tex("res://assets/crown.png", "res://assets/codex.png")
+	if _key_node and _key_node.get_node_or_null("Sprite2D") is Sprite2D:
+		var s1 := _key_node.get_node("Sprite2D") as Sprite2D
+		s1.texture = key_tex if key_tex != null else s1.texture
+		s1.z_index = 1
+	if _codex_node and _codex_node.get_node_or_null("Sprite2D") is Sprite2D:
+		var s2 := _codex_node.get_node("Sprite2D") as Sprite2D
+		s2.texture = special_tex if special_tex != null else s2.texture
+		s2.z_index = 1
+	# Also ensure sword/shield/potions render above tiles
+	if _sword_node and _sword_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_sword_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _shield_node and _shield_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_shield_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _potion_node and _potion_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_potion_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _potion2_node and _potion2_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_potion2_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	# HUD icons match the same textures
+	if _hud_icon_key:
+		_hud_icon_key.texture = key_tex if key_tex != null else _hud_icon_key.texture
+	if _hud_icon_codex:
+		_hud_icon_codex.texture = special_tex if special_tex != null else _hud_icon_codex.texture
+
+func _try_load_tex(p1: String, p2: String = "", p3: String = "") -> Texture2D:
+	var t := load(p1)
+	if t is Texture2D:
+		return t
+	if p2 != "":
+		t = load(p2)
+		if t is Texture2D:
+			return t
+	if p3 != "":
+		t = load(p3)
+		if t is Texture2D:
+			return t
+	return null
+
 func is_passable(cell: Vector2i) -> bool:
 	# Allow stepping onto the door cell so the player can win
 	return cell == _door_cell
@@ -878,6 +1127,20 @@ func _place_player(cell: Vector2i) -> void:
 		player.teleport_to_cell(cell)
 	else:
 		player.global_position = Grid.cell_to_world(cell)
+
+func _pick_free_cell_next_to_wall(grid_size: Vector2i) -> Vector2i:
+	# Prefer cells that are free and adjacent to a wall for a snug start position
+	for y in range(1, grid_size.y - 1):
+		for x in range(1, grid_size.x - 1):
+			var c := Vector2i(x, y)
+			if not _is_free(c):
+				continue
+			var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+			for d in dirs:
+				if _is_wall(c + d):
+					return c
+	# Fallback to center if none found (shouldn't happen)
+	return Vector2i(int(grid_size.x / 2), int(grid_size.y / 2))
 
 func _setup_input() -> void:
 	var mapping: Array = [
