@@ -6,11 +6,13 @@ const Goblin := preload("res://scripts/Goblin.gd")
 const Zombie := preload("res://scripts/Zombie.gd")
 const Minotaur := preload("res://scripts/Minotaur.gd")
 const Mouse := preload("res://scripts/Mouse.gd")
+const Trap := preload("res://scripts/Trap.gd")
 const Item := preload("res://scripts/Item.gd")
 const GOBLIN_SCENE: PackedScene = preload("res://scenes/Goblin.tscn")
 const ZOMBIE_SCENE: PackedScene = preload("res://scenes/Zombie.tscn")
 const MINOTAUR_SCENE: PackedScene = preload("res://scenes/Minotaur.tscn")
 const MOUSE_SCENE: PackedScene = preload("res://scenes/Mouse.tscn")
+const TRAP_SCENE: PackedScene = preload("res://scenes/Trap.tscn")
 const SPRITESHEET_PATH := "res://assets/spritesheet.png"
 const SHEET_CELL := 13
 const SHEET_SPRITE_SIZE := Vector2i(12, 12)
@@ -62,6 +64,8 @@ var CROWN_TEX: Texture2D
 var RUNE1_TEX: Texture2D
 var RUNE2_TEX: Texture2D
 var TORCH_TEX: Texture2D
+var TRAP_TEX_A: Texture2D
+var TRAP_TEX_B: Texture2D
 var BONE_TEXTURES: Array[Texture2D] = []
 var FLOOR_TEXTURES: Array[Texture2D] = []
 var WALL_TEXTURES: Array[Texture2D] = []
@@ -168,6 +172,8 @@ func _load_spritesheet_textures() -> void:
 	RUNE1_TEX = _sheet_tex(&"rune1", Vector2i(338, 221), true)
 	RUNE2_TEX = _sheet_tex(&"rune2", Vector2i(351, 221), true)
 	TORCH_TEX = _sheet_tex(&"torch", Vector2i(52, 546), true)
+	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
+	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
 		_sheet_tex(&"bone2", Vector2i(13, 494), true),
@@ -235,6 +241,7 @@ var _goblins: Array[Goblin] = []
 var _zombies: Array[Zombie] = []
 var _minotaurs: Array[Minotaur] = []
 var _mice: Array[Mouse] = []
+var _traps: Array[Trap] = []
 var _potion2_node: Item
 var _rune1_node: Item
 var _rune2_node: Item
@@ -247,6 +254,7 @@ var _level: int = 1
 var _crown_collected: bool = false
 var _is_transitioning: bool = false
 var _torch_target_level: int = 1
+var _last_trap_cell: Vector2i = Vector2i(-1, -1)
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -389,6 +397,14 @@ func _process(_delta: float) -> void:
 		if enemy != null:
 			var force_resolve := enemy is Goblin
 			_combat_round_enemy(enemy, force_resolve)
+		else:
+			var trap := _trap_at(cp)
+			if trap != null:
+				if cp != _last_trap_cell:
+					_apply_trap_damage()
+					_last_trap_cell = cp
+			else:
+				_last_trap_cell = Vector2i(-1, -1)
 	# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
 	if not _rune1_collected and cp == _rune1_cell:
 		_rune1_collected = true
@@ -472,6 +488,9 @@ func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 		_combat_round_enemy(goblin)
 		return
 	goblin.set_cell(dest)
+	var trap := _trap_at(dest)
+	if trap != null:
+		_handle_enemy_hit_by_trap(goblin)
 
 func _move_mouse(mouse: Mouse, dir: Vector2i) -> void:
 	var dest: Vector2i = mouse.grid_cell + dir
@@ -483,6 +502,10 @@ func _move_mouse(mouse: Mouse, dir: Vector2i) -> void:
 	for m in _mice:
 		if m != mouse and m.alive and m.grid_cell == dest:
 			return
+	var trap := _trap_at(dest)
+	if trap != null:
+		# mice are immune
+		return
 	mouse.set_cell(dest)
 
 func _move_homing_enemy(enemy: Enemy) -> void:
@@ -521,10 +544,17 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 		return
 	# If moving onto player, do one combat round and don't step
 	if dest == player_cell and not _game_over:
+		var trap := _trap_at(dest)
+		if trap != null:
+			_handle_enemy_hit_by_trap(enemy)
+			return
 		_combat_round_enemy(enemy)
 		return
 	# Move
 	enemy.set_cell(dest)
+	var trap2 := _trap_at(dest)
+	if trap2 != null:
+		_handle_enemy_hit_by_trap(enemy)
 
 
 func _get_grid_size() -> Vector2i:
@@ -706,6 +736,16 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 				continue
 			break
 		_spawn_mouse_at(mcell2)
+	# Spawn 0-2 traps
+	var traps_total := _rng.randi_range(0, 2)
+	for i in range(traps_total):
+		var tcell := _level_builder.pick_free_interior_cell(
+			grid_size,
+			[player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell, zcell],
+			is_free,
+			has_free_neighbor
+		)
+		_spawn_trap_at(tcell)
 
 func _restart_game() -> void:
 	# Fade to black
@@ -731,6 +771,7 @@ func _restart_game() -> void:
 	_level = 1
 	_torch_collected = false
 	_torch_target_level = _rng.randi_range(1, 2)
+	_last_trap_cell = Vector2i(-1, -1)
 	_clear_enemies()
 	# Clear maps
 	floor_map.clear()
@@ -787,6 +828,10 @@ func _restart_game() -> void:
 func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 	if _game_over or enemy == null or not enemy.alive:
 		return
+	# Trap collision check before combat
+	var trap := _trap_at(enemy.grid_cell)
+	if trap != null:
+		_handle_enemy_hit_by_trap(enemy)
 	while true:
 		var player_roll: int = _rng.randi_range(1, 20)
 		var enemy_roll: int = _rng.randi_range(1, 20)
@@ -899,6 +944,7 @@ func _start_game() -> void:
 	_hp_current = _hp_max
 	_torch_target_level = _rng.randi_range(1, 2)
 	_score = 0
+	_last_trap_cell = Vector2i(-1, -1)
 	_clear_enemies()
 	# Build board fresh
 	floor_map.clear()
@@ -971,6 +1017,8 @@ func _set_world_visible(visible: bool) -> void:
 		z.visible = visible and z.alive
 	for m in _minotaurs:
 		m.visible = visible and m.alive
+	for t in _traps:
+		t.visible = visible
 	for mouse in _mice:
 		mouse.visible = visible and mouse.alive
 	if _hud_hearts:
@@ -1103,6 +1151,13 @@ func _spawn_mouse_at(cell: Vector2i) -> void:
 	add_child(node)
 	_mice.append(node)
 
+func _spawn_trap_at(cell: Vector2i) -> void:
+	var node: Trap = TRAP_SCENE.instantiate() as Trap
+	var tex := (TRAP_TEX_A if _rng.randf() < 0.5 else TRAP_TEX_B)
+	node.setup(cell, tex)
+	add_child(node)
+	_traps.append(node)
+
 func _clear_enemies() -> void:
 	for child: Goblin in _goblins:
 		child.queue_free()
@@ -1114,11 +1169,17 @@ func _clear_enemies() -> void:
 	_zombies.clear()
 	_minotaurs.clear()
 	_clear_mice()
+	_clear_traps()
 
 func _clear_mice() -> void:
 	for m in _mice:
 		m.queue_free()
 	_mice.clear()
+
+func _clear_traps() -> void:
+	for t in _traps:
+		t.queue_free()
+	_traps.clear()
 
 func _reset_items_visibility() -> void:
 	if _key_node:
@@ -1339,6 +1400,27 @@ func _update_hud_icons() -> void:
 	if _hud_icon_torch:
 		_hud_icon_torch.visible = show and _torch_collected
 
+func _apply_trap_damage() -> void:
+	if _game_over:
+		return
+	_hp_current -= 1
+	_update_hud_hearts()
+	_play_sfx(SFX_HURT2)
+	_blink_node(player)
+	if _hp_current <= 0:
+		_game_over = true
+		_won = false
+		if player.has_method("set_control_enabled"):
+			player.set_control_enabled(false)
+
+func _handle_enemy_hit_by_trap(enemy: Enemy) -> void:
+	if enemy == null or not enemy.alive:
+		return
+	enemy.apply_damage(1)
+	if not enemy.alive:
+		enemy.visible = false
+		_leave_enemy_corpse(enemy)
+
 func _update_hud_hearts() -> void:
 	if _hud_hearts == null:
 		return
@@ -1520,4 +1602,10 @@ func _mouse_at(cell: Vector2i) -> Mouse:
 	for m in _mice:
 		if m.alive and m.grid_cell == cell:
 			return m
+	return null
+
+func _trap_at(cell: Vector2i) -> Trap:
+	for t in _traps:
+		if t.grid_cell == cell:
+			return t
 	return null
