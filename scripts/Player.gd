@@ -57,25 +57,11 @@ func _try_move(delta_cell: Vector2i) -> void:
 	var dest := _grid_pos + delta_cell
 	if _is_blocked(dest):
 		return
-	# If a living goblin is at destination, run one combat round and do not step into the cell
 	var parent := get_parent()
-	if parent and parent.has_method("_get_goblin_index_at") and parent.has_method("_combat_round"):
-		var idx: int = parent._get_goblin_index_at(dest)
-		if idx >= 0:
-			parent._combat_round(idx)
-			_end_turn()
-			return
-	# If a zombie or minotaur is at destination, run one combat round and do not step into the cell
-	if parent and parent.has_method("_get_zombie_index_at") and parent.has_method("_combat_round_zombie"):
-		var zidx: int = parent._get_zombie_index_at(dest)
-		if zidx >= 0:
-			parent._combat_round_zombie(zidx)
-			_end_turn()
-			return
-	if parent and parent.has_method("_get_minotaur_index_at") and parent.has_method("_combat_round_minotaur"):
-		var midx: int = parent._get_minotaur_index_at(dest)
-		if midx >= 0:
-			parent._combat_round_minotaur(midx)
+	if parent and parent.has_method("_get_enemy_at") and parent.has_method("_combat_round_enemy"):
+		var enemy: Enemy = parent._get_enemy_at(dest)
+		if enemy != null:
+			parent._combat_round_enemy(enemy, false)
 			_end_turn()
 			return
 	_grid_pos = dest

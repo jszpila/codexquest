@@ -5,7 +5,6 @@
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="3"]
 [ext_resource type="Script" uid="uid://chd0omw48s33h" path="res://scripts/PixelScaler.gd" id="4"]
 [ext_resource type="Texture2D" uid="uid://ojsa1cwutvr1" path="res://assets/key-1.png" id="5"]
-[ext_resource type="Texture2D" uid="uid://csnbp36r32qkp" path="res://assets/goblin-1.png" id="6"]
 [ext_resource type="Texture2D" uid="uid://svvp3seutjkw" path="res://assets/codex-quest-title.png" id="7"]
 [ext_resource type="Texture2D" uid="uid://c2rxob573x2am" path="res://assets/codex-quest-win.png" id="8"]
 [ext_resource type="Texture2D" uid="uid://l3gvmh8f4b6k" path="res://assets/codex-quest-lose.png" id="9"]
@@ -16,6 +15,7 @@
 [ext_resource type="Texture2D" uid="uid://b0g7h3ud5uan4" path="res://assets/rune-1.png" id="14"]
 [ext_resource type="Texture2D" uid="uid://d2misqo66cl05" path="res://assets/rune-2.png" id="15"]
 [ext_resource type="Texture2D" uid="uid://bwwml4mqltpf3" path="res://assets/torch.png" id="16"]
+[ext_resource type="Script" path="res://scripts/Item.gd" id="17"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -180,37 +180,36 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="Key" type="Node2D" parent="."]
+script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Key"]
 texture = ExtResource("5")
 centered = false
 
 [node name="Sword" type="Node2D" parent="."]
+script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Sword"]
 texture = ExtResource("10")
 centered = false
 
 [node name="Shield" type="Node2D" parent="."]
+script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Shield"]
 texture = ExtResource("11")
 centered = false
 
 [node name="Potion" type="Node2D" parent="."]
+script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Potion"]
 texture = ExtResource("12")
 centered = false
 
 [node name="Codex" type="Node2D" parent="."]
+script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Codex"]
 texture = ExtResource("13")
-centered = false
-
-[node name="Goblin" type="Node2D" parent="."]
-
-[node name="Sprite2D" type="Sprite2D" parent="Goblin"]
-texture = ExtResource("6")
 centered = false

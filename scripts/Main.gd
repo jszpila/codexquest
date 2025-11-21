@@ -1,12 +1,21 @@
 extends Node2D
 
+const LevelBuilder := preload("res://scripts/LevelBuilder.gd")
+const Enemy := preload("res://scripts/Enemy.gd")
+const Goblin := preload("res://scripts/Goblin.gd")
+const Zombie := preload("res://scripts/Zombie.gd")
+const Minotaur := preload("res://scripts/Minotaur.gd")
+const GOBLIN_SCENE: PackedScene = preload("res://scenes/Goblin.tscn")
+const ZOMBIE_SCENE: PackedScene = preload("res://scenes/Zombie.tscn")
+const MINOTAUR_SCENE: PackedScene = preload("res://scenes/Minotaur.tscn")
+const Item := preload("res://scripts/Item.gd")
 const GRID_W := 40 # unused; kept for reference
 const GRID_H := 25 # unused; kept for reference
 
-const TILE_FLOOR := Vector2i(0, 0)
-const TILE_WALL := Vector2i(0, 0)
-const SOURCES_FLOOR := [0, 1, 2, 3]
-const SOURCES_WALL := [4, 5, 6, 7]
+const TILE_FLOOR: Vector2i = Vector2i(0, 0)
+const TILE_WALL: Vector2i = Vector2i(0, 0)
+const SOURCES_FLOOR: Array[int] = [0, 1, 2, 3]
+const SOURCES_WALL: Array[int] = [4, 5, 6, 7]
 const FIXED_GRID_W := 48
 const FIXED_GRID_H := 36
 const BONE_TEXTURES: Array[Texture2D] = [
@@ -37,6 +46,10 @@ const SFX_START: AudioStream = preload("res://assets/start.wav")
 const SIGHT_INNER_TILES := 5
 const SIGHT_OUTER_TILES := 10
 const SIGHT_MAX_DARK := 0.8
+const FLOOR_ALPHA_MIN := 1.0
+const FLOOR_ALPHA_MAX := 1.0
+const BONE_ALPHA_MIN := 1.0
+const BONE_ALPHA_MAX := 1.0
 
 @onready var floor_map: TileMap = $Floor
 @onready var walls_map: TileMap = $Walls
@@ -51,12 +64,11 @@ const SIGHT_MAX_DARK := 0.8
 @onready var _hud_icon_rune2: TextureRect = $HUD/HUDRune2Icon
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDTorchIcon
 @onready var _fade: ColorRect = $HUD/Fade
-@onready var _key_node: Node2D = $Key
-@onready var _sword_node: Node2D = $Sword
-@onready var _shield_node: Node2D = $Shield
-@onready var _potion_node: Node2D = $Potion
-@onready var _codex_node: Node2D = $Codex
-@onready var _goblin_node: Node2D = $Goblin
+@onready var _key_node: Item = $Key
+@onready var _sword_node: Item = $Sword
+@onready var _shield_node: Item = $Shield
+@onready var _potion_node: Item = $Potion
+@onready var _codex_node: Item = $Codex
 @onready var _decor: Node2D = $Decor
 @onready var _title_layer: CanvasLayer = $Title
 @onready var _title_label: Label = $Title/TitleLabel
@@ -73,6 +85,7 @@ var _fov_visible: Array[bool] = []
 var _fov_dist: Array[float] = []
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _level_builder: LevelBuilder
 var _key_cell: Vector2i = Vector2i.ZERO
 var _sword_cell: Vector2i = Vector2i.ZERO
 var _shield_cell: Vector2i = Vector2i.ZERO
@@ -95,21 +108,13 @@ var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
 var _won: bool = false
 var _score: int = 0
-var _goblin_nodes: Array[Node2D] = []
-var _goblin_cells: Array[Vector2i] = []
-var _goblin_alive: Array[bool] = []
-var _zombie_nodes: Array[Node2D] = []
-var _zombie_cells: Array[Vector2i] = []
-var _zombie_alive: Array[bool] = []
-var _zombie_hp: Array[int] = []
-var _minotaur_nodes: Array[Node2D] = []
-var _minotaur_cells: Array[Vector2i] = []
-var _minotaur_alive: Array[bool] = []
-var _minotaur_hp: Array[int] = []
-var _potion2_node: Node2D
-var _rune1_node: Node2D
-var _rune2_node: Node2D
-var _torch_node: Node2D
+var _goblins: Array[Goblin] = []
+var _zombies: Array[Zombie] = []
+var _minotaurs: Array[Minotaur] = []
+var _potion2_node: Item
+var _rune1_node: Item
+var _rune2_node: Item
+var _torch_node: Item
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
@@ -127,6 +132,7 @@ var _state: int = STATE_TITLE
 func _ready() -> void:
 	_setup_input()
 	_rng.randomize()
+	_level_builder = LevelBuilder.new(_rng)
 	# Start at title screen
 	_state = STATE_TITLE
 	_show_title(true)
@@ -163,7 +169,7 @@ func _process(_delta: float) -> void:
 		_key_collected = true
 		print("GOT KEY")
 		if _key_node:
-			_key_node.visible = false
+			_key_node.collect()
 		_score += 1
 		_update_door_texture()
 		_update_hud_icons()
@@ -174,7 +180,7 @@ func _process(_delta: float) -> void:
 		_sword_collected = true
 		print("GOT SWORD")
 		if _sword_node:
-			_sword_node.visible = false
+			_sword_node.collect()
 			_score += 1
 			_update_player_sprite_appearance()
 			_update_hud_icons()
@@ -187,7 +193,7 @@ func _process(_delta: float) -> void:
 				print("[DEBUG] On potion1 cell. hp=", _hp_current, "/", _hp_max)
 				_potion_collected = true
 				if _potion_node:
-					_potion_node.visible = false
+					_potion_node.collect()
 				consumed = true
 			else:
 				print("[DEBUG] On potion1 but at max HP; not consuming")
@@ -196,7 +202,7 @@ func _process(_delta: float) -> void:
 				print("[DEBUG] On potion2 cell. hp=", _hp_current, "/", _hp_max)
 				_potion2_collected = true
 				if _potion2_node:
-					_potion2_node.visible = false
+					_potion2_node.collect()
 				consumed = true
 			else:
 				print("[DEBUG] On potion2 but at max HP; not consuming")
@@ -212,7 +218,7 @@ func _process(_delta: float) -> void:
 			_codex_collected = true
 			print("GOT CODEX")
 			if _codex_node:
-				_codex_node.visible = false
+				_codex_node.collect()
 			_score += 1
 			_update_hud_icons()
 			_update_door_texture()
@@ -224,7 +230,7 @@ func _process(_delta: float) -> void:
 			_crown_collected = true
 			print("GOT CROWN")
 			if _codex_node:
-				_codex_node.visible = false
+				_codex_node.collect()
 			_score += 1
 			_update_hud_icons()
 			_update_door_texture()
@@ -234,7 +240,7 @@ func _process(_delta: float) -> void:
 		_shield_collected = true
 		print("GOT SHIELD")
 		if _shield_node:
-			_shield_node.visible = false
+			_shield_node.collect()
 			_score += 1
 			_update_player_sprite_appearance()
 			_update_hud_icons()
@@ -245,7 +251,7 @@ func _process(_delta: float) -> void:
 		_torch_collected = true
 		print("GOT TORCH (+4 SIGHT)")
 		if _torch_node:
-			_torch_node.visible = false
+			_torch_node.collect()
 		_update_hud_icons()
 		_update_fov()
 		_play_sfx(SFX_PICKUP2)
@@ -253,26 +259,16 @@ func _process(_delta: float) -> void:
 		_score += 1
 
 	if not _game_over:
-		for i in range(_goblin_cells.size()):
-			if _goblin_alive.size() > i and _goblin_alive[i] and cp == _goblin_cells[i]:
-				_resolve_combat(i)
-				break
-		# Check zombie contact
-		for zi in range(_zombie_cells.size()):
-			if _zombie_alive.size() > zi and _zombie_alive[zi] and cp == _zombie_cells[zi]:
-				_combat_round_zombie(zi)
-				break
-		# Check minotaur contact
-		for mi in range(_minotaur_cells.size()):
-			if _minotaur_alive.size() > mi and _minotaur_alive[mi] and cp == _minotaur_cells[mi]:
-				_combat_round_minotaur(mi)
-				break
+		var enemy: Enemy = _get_enemy_at(cp)
+		if enemy != null:
+			var force_resolve := enemy is Goblin
+			_combat_round_enemy(enemy, force_resolve)
 	# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
 	if not _rune1_collected and cp == _rune1_cell:
 		_rune1_collected = true
 		print("GOT RUNE-1 (+1 ATK)")
 		if _rune1_node:
-			_rune1_node.visible = false
+			_rune1_node.collect()
 		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
@@ -281,7 +277,7 @@ func _process(_delta: float) -> void:
 		_rune2_collected = true
 		print("GOT RUNE-2 (+1 DEF)")
 		if _rune2_node:
-			_rune2_node.visible = false
+			_rune2_node.collect()
 		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
@@ -297,24 +293,18 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 	print("[DEBUG] moved=", new_cell, " potion1=", _potion_cell, " p1col=", _potion_collected, 
 		" potion2=", _potion2_cell, " p2col=", _potion2_collected)
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
-	for i in range(_goblin_cells.size()):
-		if _goblin_alive.size() <= i or not _goblin_alive[i]:
-			continue
-		if _rng.randf() <= 0.75:
+	for goblin: Goblin in _goblins:
+		if goblin.alive and _rng.randf() <= 0.75:
 			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
-			_move_goblin(i, d)
+			_move_goblin(goblin, d)
 	# Move zombie (one per level) with low accuracy towards player, less accurate at distance
-	if _zombie_cells.size() > 0:
-		for i in range(_zombie_cells.size()):
-			if _zombie_alive.size() <= i or not _zombie_alive[i]:
-				continue
-			_move_homing_enemy("zombie", i)
+	for zombie: Zombie in _zombies:
+		if zombie.alive:
+			_move_homing_enemy(zombie)
 	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
-	if _minotaur_cells.size() > 0:
-		for i in range(_minotaur_cells.size()):
-			if _minotaur_alive.size() <= i or not _minotaur_alive[i]:
-				continue
-			_move_homing_enemy("minotaur", i)
+	for mino: Minotaur in _minotaurs:
+		if mino.alive:
+			_move_homing_enemy(mino)
 	_update_fov()
 	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
 	if not _potion_collected and new_cell == _potion_cell:
@@ -342,23 +332,19 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 		else:
 			print("[DEBUG] On potion2 via moved but at max HP; not consuming")
 
-func _move_goblin(index: int, dir: Vector2i) -> void:
-	var dest := _goblin_cells[index] + dir
-	if not _in_interior(dest):
-		return
-	if _is_wall(dest):
+func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
+	var dest: Vector2i = goblin.grid_cell + dir
+	if not _can_enemy_step(dest, goblin):
 		return
 	var player_cell := Grid.world_to_cell(player.global_position)
 	# If goblin would move onto player, do one combat round and don't move into that cell
-	if dest == player_cell and _goblin_alive.size() > index and _goblin_alive[index] and not _game_over:
-		_combat_round(index)
+	if dest == player_cell and goblin.alive and not _game_over:
+		_combat_round_enemy(goblin)
 		return
-	_goblin_cells[index] = dest
-	if _goblin_nodes.size() > index and _goblin_nodes[index]:
-		_goblin_nodes[index].global_position = Grid.cell_to_world(_goblin_cells[index])
+	goblin.set_cell(dest)
 
-func _move_homing_enemy(kind: String, index: int) -> void:
-	var ecell := _zombie_cells[index] if kind == "zombie" else _minotaur_cells[index]
+func _move_homing_enemy(enemy: Enemy) -> void:
+	var ecell := enemy.grid_cell
 	var player_cell := Grid.world_to_cell(player.global_position)
 	var delta: Vector2i = player_cell - ecell
 	var dist: int = abs(delta.x) + abs(delta.y)
@@ -370,7 +356,7 @@ func _move_homing_enemy(kind: String, index: int) -> void:
 		cand.append(Vector2i(0, 1 if delta.y > 0 else -1))
 	# Accuracy: minotaur more accurate; zombie less, and decreases with distance
 	var p_towards := 0.7
-	if kind == "zombie":
+	if enemy.enemy_type == &"zombie":
 		p_towards = clamp(0.8 - 0.05 * float(dist), 0.2, 0.8)
 	else:
 		p_towards = clamp(0.95 - 0.02 * float(dist), 0.5, 0.95)
@@ -388,184 +374,111 @@ func _move_homing_enemy(kind: String, index: int) -> void:
 				break
 		if dir == Vector2i.ZERO:
 			dir = dirs[0]
-	var dest := ecell + dir
-	if not _in_interior(dest) or _is_wall(dest):
+	var dest: Vector2i = ecell + dir
+	if not _can_enemy_step(dest, enemy):
 		return
 	# If moving onto player, do one combat round and don't step
 	if dest == player_cell and not _game_over:
-		if kind == "zombie":
-			_combat_round_zombie(index)
-		else:
-			_combat_round_minotaur(index)
+		_combat_round_enemy(enemy)
 		return
 	# Move
-	if kind == "zombie":
-		_zombie_cells[index] = dest
-		if _zombie_nodes.size() > index and _zombie_nodes[index]:
-			_zombie_nodes[index].global_position = Grid.cell_to_world(dest)
-	else:
-		_minotaur_cells[index] = dest
-		if _minotaur_nodes.size() > index and _minotaur_nodes[index]:
-			_minotaur_nodes[index].global_position = Grid.cell_to_world(dest)
+	enemy.set_cell(dest)
 
-
-func _build_test_map(grid_size: Vector2i) -> void:
-	var ts: TileSet = floor_map.tile_set
-	if ts == null:
-		push_warning("TileSet missing on Floor TileMap")
-		return
-	# Use the first atlas source explicitly (id 0)
-	# Ensure tiles exist in both atlas sources (Godot 4 requires explicit tiles)
-	for sid in SOURCES_FLOOR:
-		var srcf: TileSetAtlasSource = ts.get_source(sid)
-		if srcf != null and not srcf.has_tile(TILE_FLOOR):
-			srcf.create_tile(TILE_FLOOR)
-	for sid in SOURCES_WALL:
-		var srcw: TileSetAtlasSource = ts.get_source(sid)
-		if srcw != null and not srcw.has_tile(TILE_WALL):
-			srcw.create_tile(TILE_WALL)
-	# Fill floor to cover the entire viewport (ceil)
-	for y in range(grid_size.y):
-		for x in range(grid_size.x):
-			var fsid: int = SOURCES_FLOOR[_rng.randi_range(0, SOURCES_FLOOR.size() - 1)]
-			var c := Vector2i(x, y)
-			floor_map.set_cell(0, c, fsid, TILE_FLOOR)
-			_randomize_floor_wall_transform(floor_map, c)
-	# Outline walls on border
-	for x in range(grid_size.x):
-		var wsid_top: int = SOURCES_WALL[_rng.randi_range(0, SOURCES_WALL.size() - 1)]
-		var wsid_bottom: int = SOURCES_WALL[_rng.randi_range(0, SOURCES_WALL.size() - 1)]
-		var ctop := Vector2i(x, 0)
-		var cbottom := Vector2i(x, grid_size.y - 1)
-		walls_map.set_cell(0, ctop, wsid_top, TILE_WALL)
-		_randomize_floor_wall_transform(walls_map, ctop)
-		walls_map.set_cell(0, cbottom, wsid_bottom, TILE_WALL)
-		_randomize_floor_wall_transform(walls_map, cbottom)
-	for y in range(grid_size.y):
-		var wsid_left: int = SOURCES_WALL[_rng.randi_range(0, SOURCES_WALL.size() - 1)]
-		var wsid_right: int = SOURCES_WALL[_rng.randi_range(0, SOURCES_WALL.size() - 1)]
-		var cleft := Vector2i(0, y)
-		var cright := Vector2i(grid_size.x - 1, y)
-		walls_map.set_cell(0, cleft, wsid_left, TILE_WALL)
-		_randomize_floor_wall_transform(walls_map, cleft)
-		walls_map.set_cell(0, cright, wsid_right, TILE_WALL)
-		_randomize_floor_wall_transform(walls_map, cright)
 
 func _get_grid_size() -> Vector2i:
 	# Use a fixed world size (in tiles)
 	return Vector2i(FIXED_GRID_W, FIXED_GRID_H)
 
-func _random_interior_cell(grid_size: Vector2i) -> Vector2i:
-	# Avoid walls by choosing from the interior
-	var x := _rng.randi_range(1, grid_size.x - 2)
-	var y := _rng.randi_range(1, grid_size.y - 2)
-	return Vector2i(x, y)
-
-func _pick_free_interior_cell(grid_size: Vector2i, exclude: Array[Vector2i], require_neighbor: bool = true) -> Vector2i:
-	# Gather all eligible interior cells, excluding provided list
-	var pool: Array[Vector2i] = []
-	for y in range(1, grid_size.y - 1):
-		for x in range(1, grid_size.x - 1):
-			var c := Vector2i(x, y)
-			if exclude.has(c):
-				continue
-			if not _is_free(c):
-				continue
-			if require_neighbor and not _has_free_neighbor(c):
-				continue
-			pool.append(c)
-	# Fallbacks if too constrained
-	if pool.is_empty() and require_neighbor:
-		return _pick_free_interior_cell(grid_size, exclude, false)
-	if pool.is_empty():
-		# As a last resort, pick any interior cell not in exclude
-		for y in range(1, grid_size.y - 1):
-			for x in range(1, grid_size.x - 1):
-				var c2 := Vector2i(x, y)
-				if exclude.has(c2):
-					continue
-				pool.append(c2)
-	if pool.is_empty():
-		return Vector2i(1, 1)
-	return pool[_rng.randi_range(0, pool.size() - 1)]
+func _build_maps(grid_size: Vector2i) -> void:
+	_level_builder.build_test_map(
+		floor_map,
+		walls_map,
+		grid_size,
+		SOURCES_FLOOR,
+		SOURCES_WALL,
+		TILE_FLOOR,
+		TILE_WALL,
+		FLOOR_ALPHA_MIN,
+		FLOOR_ALPHA_MAX
+	)
 
 func _place_random_entities(grid_size: Vector2i) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)
+	var is_free := Callable(self, "_is_free")
+	var has_free_neighbor := Callable(self, "_has_free_neighbor")
+	_clear_enemies()
+	_reset_items_visibility()
 	# Place key
-	_key_cell = _pick_free_interior_cell(grid_size, [player_cell])
+	_key_cell = _level_builder.pick_free_interior_cell(grid_size, [player_cell], is_free, has_free_neighbor)
 	if _key_node:
-		_key_node.global_position = Grid.cell_to_world(_key_cell)
+		_key_node.place(_key_cell)
 	# Place sword
 	if not _sword_collected:
-		_sword_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell])
+		_sword_cell = _level_builder.pick_free_interior_cell(grid_size, [player_cell, _key_cell], is_free, has_free_neighbor)
 		if _sword_node:
-			_sword_node.global_position = Grid.cell_to_world(_sword_cell)
+			_sword_node.place(_sword_cell)
 	elif _sword_node:
-		_sword_node.visible = false
+		_sword_node.collect()
 	# Place shield
 	if not _shield_collected:
-		_shield_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell])
+		_shield_cell = _level_builder.pick_free_interior_cell(
+			grid_size,
+			[player_cell, _key_cell, _sword_cell],
+			is_free,
+			has_free_neighbor
+		)
 		if _shield_node:
-			_shield_node.global_position = Grid.cell_to_world(_shield_cell)
+			_shield_node.place(_shield_cell)
 	elif _shield_node:
-		_shield_node.visible = false
+		_shield_node.collect()
 	# Place potion(s)
-	_potion_cell = _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell])
+	_potion_cell = _level_builder.pick_free_interior_cell(
+		grid_size,
+		[player_cell, _key_cell, _sword_cell, _shield_cell],
+		is_free,
+		has_free_neighbor
+	)
 	if _potion_node:
-		_potion_node.global_position = Grid.cell_to_world(_potion_cell)
+		_potion_node.place(_potion_cell)
 	# On level 2+, add a second potion at a distinct free cell
 	if _level >= 2:
 		var exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
-		_potion2_cell = _pick_free_interior_cell(grid_size, exclude)
+		_potion2_cell = _level_builder.pick_free_interior_cell(grid_size, exclude, is_free, has_free_neighbor)
 		if _potion2_node == null and _potion_node != null:
-			_potion2_node = _potion_node.duplicate()
+			_potion2_node = _potion_node.duplicate() as Item
 			_potion2_node.name = "PotionExtra"
 			add_child(_potion2_node)
 		if _potion2_node != null:
-			_potion2_node.global_position = Grid.cell_to_world(_potion2_cell)
+			_potion2_node.place(_potion2_cell)
 			_potion2_node.visible = true
 	# Place codex (or crown on L2) avoiding potions
 	var codex_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
 	if _level >= 2:
 		codex_exclude.append(_potion2_cell)
-	_codex_cell = _pick_free_interior_cell(grid_size, codex_exclude)
+	_codex_cell = _level_builder.pick_free_interior_cell(grid_size, codex_exclude, is_free, has_free_neighbor)
 	if _codex_node:
-		_codex_node.global_position = Grid.cell_to_world(_codex_cell)
+		_codex_node.place(_codex_cell)
 	# Place runes (only on level 2+, if not already collected)
 	if _level >= 2:
 		var base_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
 		base_exclude.append(_potion2_cell)
 		if not _rune1_collected:
-			_rune1_cell = _pick_free_interior_cell(grid_size, base_exclude)
+			_rune1_cell = _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
 			base_exclude.append(_rune1_cell)
 			if _rune1_node == null:
-				_rune1_node = Node2D.new()
-				_rune1_node.name = "Rune1"
-				var s := Sprite2D.new()
-				s.centered = false
-				s.texture = _try_load_tex("res://assets/rune-1.png")
-				s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				s.z_index = 1
-				_rune1_node.add_child(s)
+				_rune1_node = _make_item_node("Rune1", "res://assets/rune-1.png")
 				add_child(_rune1_node)
-			_rune1_node.global_position = Grid.cell_to_world(_rune1_cell)
+			_rune1_node.place(_rune1_cell)
 			_rune1_node.visible = true
 		else:
 			if _rune1_node:
 				_rune1_node.visible = false
 		if not _rune2_collected:
-			_rune2_cell = _pick_free_interior_cell(grid_size, base_exclude)
+			_rune2_cell = _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
 			if _rune2_node == null:
-				_rune2_node = Node2D.new()
-				_rune2_node.name = "Rune2"
-				var s2 := Sprite2D.new()
-				s2.centered = false
-				s2.texture = _try_load_tex("res://assets/rune-2.png")
-				s2.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				s2.z_index = 1
-				_rune2_node.add_child(s2)
+				_rune2_node = _make_item_node("Rune2", "res://assets/rune-2.png")
 				add_child(_rune2_node)
-			_rune2_node.global_position = Grid.cell_to_world(_rune2_cell)
+			_rune2_node.place(_rune2_cell)
 			_rune2_node.visible = true
 		else:
 			if _rune2_node:
@@ -581,18 +494,11 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 				exclude2.append(_rune1_cell)
 			if _rune2_cell != Vector2i.ZERO:
 				exclude2.append(_rune2_cell)
-			_torch_cell = _pick_free_interior_cell(grid_size, exclude2)
+			_torch_cell = _level_builder.pick_free_interior_cell(grid_size, exclude2, is_free, has_free_neighbor)
 			if _torch_node == null:
-				_torch_node = Node2D.new()
-				_torch_node.name = "Torch"
-				var s3 := Sprite2D.new()
-				s3.centered = false
-				s3.texture = tex
-				s3.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				s3.z_index = 1
-				_torch_node.add_child(s3)
+				_torch_node = _make_item_node("Torch", "res://assets/torch.png")
 				add_child(_torch_node)
-			_torch_node.global_position = Grid.cell_to_world(_torch_cell)
+			_torch_node.place(_torch_cell)
 			_torch_node.visible = true
 	else:
 		# Hide runes entirely on level 1
@@ -605,23 +511,6 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	print("  key=", _key_cell, " sword=", _sword_cell, " shield=", _shield_cell)
 	print("  potion1=", _potion_cell, " potion2=", (_potion2_cell if _level >= 2 else Vector2i(-1, -1)))
 	print("  special(cell)=", _codex_cell, " collected L1? ", _codex_collected, " crown L2+? ", _crown_collected)
-	# Reset goblin lists and remove any existing extras
-	_clear_extra_goblins()
-	_goblin_nodes.clear()
-	_goblin_cells.clear()
-	_goblin_alive.clear()
-	# Reset zombie/minotaur
-	for child in get_children():
-		if child is Node2D and (child.name.begins_with("Zombie") or child.name.begins_with("Minotaur")):
-			child.queue_free()
-	_zombie_nodes.clear()
-	_zombie_cells.clear()
-	_zombie_alive.clear()
-	_zombie_hp.clear()
-	_minotaur_nodes.clear()
-	_minotaur_cells.clear()
-	_minotaur_alive.clear()
-	_minotaur_hp.clear()
 	# Decide total goblins: base + 0-3 extra
 	var total := 1 + _rng.randi_range(0, 3)
 	var attempts := 0
@@ -630,15 +519,10 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		var gcell := Vector2i.ZERO
 		while attempts < 2000:
 			attempts += 1
-			gcell = _random_interior_cell(grid_size)
+			gcell = _level_builder.random_interior_cell(grid_size)
 			if gcell == player_cell or gcell == _key_cell:
 				continue
-			var clash := false
-			for j in range(_goblin_cells.size()):
-				if gcell == _goblin_cells[j]:
-					clash = true
-					break
-			if clash:
+			if _get_enemy_at(gcell) != null:
 				continue
 			if not _is_free(gcell):
 				continue
@@ -648,11 +532,21 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_spawn_goblin_at(gcell)
 
 	# Spawn exactly one zombie per level
-	var zcell := _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell])
+	var zcell := _level_builder.pick_free_interior_cell(
+		grid_size,
+		[player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell],
+		is_free,
+		has_free_neighbor
+	)
 	_spawn_zombie_at(zcell)
 	# Spawn minotaur only on level 2, exactly one
 	if _level >= 2:
-		var mcell := _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell, zcell])
+		var mcell := _level_builder.pick_free_interior_cell(
+			grid_size,
+			[player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell, zcell],
+			is_free,
+			has_free_neighbor
+		)
 		_spawn_minotaur_at(mcell)
 
 func _restart_game() -> void:
@@ -679,16 +573,14 @@ func _restart_game() -> void:
 	_level = 1
 	_torch_collected = false
 	_torch_target_level = _rng.randi_range(1, 2)
-	_goblin_nodes.clear()
-	_goblin_cells.clear()
-	_goblin_alive.clear()
+	_clear_enemies()
 	# Clear maps
 	floor_map.clear()
 	walls_map.clear()
 	# Rebuild
 	var grid_size := _get_grid_size()
 	_grid_size = grid_size
-	_build_test_map(grid_size)
+	_build_maps(grid_size)
 	_ensure_fov_overlay()
 	_place_player(Vector2i(int(grid_size.x / 2), int(grid_size.y / 2)))
 	_place_random_inner_walls(grid_size)
@@ -700,17 +592,23 @@ func _restart_game() -> void:
 	_update_fov()
 	# Show entities
 	if _key_node:
-		_key_node.visible = true
+		_key_node.place(_key_cell)
 	if _sword_node:
-		_sword_node.visible = not _sword_collected
+		if _sword_collected:
+			_sword_node.collect()
+		else:
+			_sword_node.place(_sword_cell)
 	if _shield_node:
-		_shield_node.visible = not _shield_collected
+		if _shield_collected:
+			_shield_node.collect()
+		else:
+			_shield_node.place(_shield_cell)
 	if _potion_node:
-		_potion_node.visible = true
+		_potion_node.place(_potion_cell)
 	if _potion2_node:
 		_potion2_node.visible = _level >= 2
 	if _codex_node:
-		_codex_node.visible = true
+		_codex_node.place(_codex_cell)
 	# Re-enable player controls
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(true)
@@ -728,146 +626,75 @@ func _restart_game() -> void:
 	await tw2.finished
 	_is_transitioning = false
 
-func _resolve_combat(gidx: int) -> void:
-	# Roll d20 for player and goblin until there's a winner
+func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
+	if _game_over or enemy == null or not enemy.alive:
+		return
 	while true:
 		var player_roll: int = _rng.randi_range(1, 20)
-		var goblin_roll: int = _rng.randi_range(1, 20)
-		# Apply equipment modifiers
+		var enemy_roll: int = _rng.randi_range(1, 20)
 		if _sword_collected:
 			player_roll += 1
 		if _rune1_collected:
 			player_roll += 1
 		if _shield_collected:
-			goblin_roll -= 1
+			enemy_roll -= 1
 		if _rune2_collected:
-			goblin_roll -= 1
-		print("Player rolls ", player_roll, ", Goblin rolls ", goblin_roll)
-		if player_roll == goblin_roll:
-			continue
-		if player_roll > goblin_roll:
-			# Player wins: goblin disappears
+			enemy_roll -= 1
+		print("Player rolls ", player_roll, ", ", enemy.enemy_type, " rolls ", enemy_roll)
+		if player_roll == enemy_roll:
+			if force_outcome:
+				continue
+			return
+		if player_roll > enemy_roll:
 			_play_sfx(SFX_HURT1)
-			_goblin_alive[gidx] = false
-			_goblin_nodes[gidx].visible = false
-			_leave_goblin_corpse(_goblin_cells[gidx])
-			_play_sfx(SFX_HURT3)
-			_score += 1
+			_blink_node(enemy)
+			enemy.apply_damage(1)
+			if not enemy.alive:
+				_handle_enemy_death(enemy)
 			_check_win()
-			break
+		else:
+			_handle_player_hit()
+		break
 
-func _combat_round(gidx: int) -> void:
-	if _game_over:
+func _handle_enemy_death(enemy: Enemy) -> void:
+	if enemy == null:
 		return
-	var player_roll: int = _rng.randi_range(1, 20)
-	var goblin_roll: int = _rng.randi_range(1, 20)
-	if _sword_collected:
-		player_roll += 1
-	if _rune1_collected:
-		player_roll += 1
-	if _shield_collected:
-		goblin_roll -= 1
-	if _rune2_collected:
-		goblin_roll -= 1
-	print("Player rolls ", player_roll, ", Goblin rolls ", goblin_roll)
-	if player_roll == goblin_roll:
-		return
-	if player_roll > goblin_roll:
-		_play_sfx(SFX_HURT1)
-		_blink_node(_goblin_nodes[gidx])
-		_goblin_alive[gidx] = false
-		_goblin_nodes[gidx].visible = false
-		_leave_goblin_corpse(_goblin_cells[gidx])
-		_play_sfx(SFX_HURT3)
-		_score += 1
-		_check_win()
-	else:
-		_hp_current -= 1
-		print("Player loses 1 HP. HP now:", _hp_current)
-		_update_hud_hearts()
-		_play_sfx(SFX_HURT2)
-		_blink_node(player)
-		if _hp_current <= 0:
-			_game_over = true
-			_won = false
-			if player.has_method("set_control_enabled"):
-				player.set_control_enabled(false)
+	enemy.visible = false
+	_leave_enemy_corpse(enemy)
+	_play_sfx(SFX_HURT3)
+	_score += 1
 
-func _combat_round_zombie(zidx: int) -> void:
-	if _game_over or _zombie_alive.size() <= zidx or not _zombie_alive[zidx]:
+func _leave_enemy_corpse(enemy: Enemy) -> void:
+	if _decor == null or enemy == null:
 		return
-	var player_roll: int = _rng.randi_range(1, 20)
-	var z_roll: int = _rng.randi_range(1, 20)
-	if _sword_collected:
-		player_roll += 1
-	if _rune1_collected:
-		player_roll += 1
-	if _shield_collected:
-		z_roll -= 1
-	if _rune2_collected:
-		z_roll -= 1
-	print("Player rolls ", player_roll, ", Zombie rolls ", z_roll)
-	if player_roll == z_roll:
+	var corpse_tex := enemy.corpse_texture
+	if corpse_tex == null:
+		if enemy.enemy_type == &"goblin":
+			corpse_tex = DEAD_GOBLIN_TEX
+		elif enemy.enemy_type == &"zombie":
+			corpse_tex = ZOMBIE_TEX_2
+		elif enemy.enemy_type == &"minotaur":
+			corpse_tex = MINO_TEX_2
+	if corpse_tex == null:
 		return
-	if player_roll > z_roll:
-		_play_sfx(SFX_HURT1)
-		_blink_node(_zombie_nodes[zidx])
-		_zombie_hp[zidx] -= 1
-		if _zombie_hp[zidx] <= 0:
-			_zombie_alive[zidx] = false
-			_zombie_nodes[zidx].visible = false
-			_leave_zombie_corpse(_zombie_cells[zidx])
-			_play_sfx(SFX_HURT3)
-			_score += 1
-	else:
-		_hp_current -= 1
-		print("Player loses 1 HP. HP now:", _hp_current)
-		_update_hud_hearts()
-		_play_sfx(SFX_HURT2)
-		_blink_node(player)
-		if _hp_current <= 0:
-			_game_over = true
-			_won = false
-			if player.has_method("set_control_enabled"):
-				player.set_control_enabled(false)
+	var s := Sprite2D.new()
+	s.texture = corpse_tex
+	s.centered = false
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.global_position = Grid.cell_to_world(enemy.grid_cell)
+	_decor.add_child(s)
 
-func _combat_round_minotaur(midx: int) -> void:
-	if _game_over or _minotaur_alive.size() <= midx or not _minotaur_alive[midx]:
-		return
-	var player_roll: int = _rng.randi_range(1, 20)
-	var m_roll: int = _rng.randi_range(1, 20)
-	if _sword_collected:
-		player_roll += 1
-	if _rune1_collected:
-		player_roll += 1
-	if _shield_collected:
-		m_roll -= 1
-	if _rune2_collected:
-		m_roll -= 1
-	print("Player rolls ", player_roll, ", Minotaur rolls ", m_roll)
-	if player_roll == m_roll:
-		return
-	if player_roll > m_roll:
-		_play_sfx(SFX_HURT1)
-		_blink_node(_minotaur_nodes[midx])
-		_minotaur_hp[midx] -= 1
-		if _minotaur_hp[midx] <= 0:
-			_minotaur_alive[midx] = false
-			_minotaur_nodes[midx].visible = false
-			_leave_minotaur_corpse(_minotaur_cells[midx])
-			_play_sfx(SFX_HURT3)
-			_score += 1
-	else:
-		_hp_current -= 1
-		print("Player loses 1 HP. HP now:", _hp_current)
-		_update_hud_hearts()
-		_play_sfx(SFX_HURT2)
-		_blink_node(player)
-		if _hp_current <= 0:
-			_game_over = true
-			_won = false
-			if player.has_method("set_control_enabled"):
-				player.set_control_enabled(false)
+func _handle_player_hit() -> void:
+	_hp_current -= 1
+	print("Player loses 1 HP. HP now:", _hp_current)
+	_update_hud_hearts()
+	_play_sfx(SFX_HURT2)
+	_blink_node(player)
+	if _hp_current <= 0:
+		_game_over = true
+		_won = false
+		if player.has_method("set_control_enabled"):
+			player.set_control_enabled(false)
 
 
 
@@ -914,16 +741,13 @@ func _start_game() -> void:
 	_hp_current = _hp_max
 	_torch_target_level = _rng.randi_range(1, 2)
 	_score = 0
-	_goblin_nodes.clear()
-	_goblin_cells.clear()
-	_goblin_alive.clear()
+	_clear_enemies()
 	# Build board fresh
-	_clear_extra_goblins()
 	floor_map.clear()
 	walls_map.clear()
 	var grid_size := _get_grid_size()
 	_grid_size = grid_size
-	_build_test_map(grid_size)
+	_build_maps(grid_size)
 	_ensure_fov_overlay()
 	_place_player(Vector2i(int(grid_size.x / 2), int(grid_size.y / 2)))
 	_place_random_inner_walls(grid_size)
@@ -983,12 +807,12 @@ func _set_world_visible(visible: bool) -> void:
 			# Only show special item if not collected for the current level
 			var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
 			_codex_node.visible = visible and special_uncollected
-	for i in range(_goblin_nodes.size()):
-		_goblin_nodes[i].visible = visible and _goblin_alive[i]
-	for i in range(_zombie_nodes.size()):
-		_zombie_nodes[i].visible = visible and _zombie_alive[i]
-	for i in range(_minotaur_nodes.size()):
-		_minotaur_nodes[i].visible = visible and _minotaur_alive[i]
+	for g in _goblins:
+		g.visible = visible and g.alive
+	for z in _zombies:
+		z.visible = visible and z.alive
+	for m in _minotaurs:
+		m.visible = visible and m.alive
 	if _hud_hearts:
 		_hud_hearts.visible = visible
 	_decor.visible = visible
@@ -1089,55 +913,63 @@ func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	return points
 
 func _spawn_goblin_at(cell: Vector2i) -> void:
-	var node: Node2D
-	if _goblin_nodes.size() == 0:
-		node = _goblin_node
-	else:
-		node = _goblin_node.duplicate()
-		node.name = "GoblinExtra%d" % _goblin_nodes.size()
-		add_child(node)
-	_goblin_nodes.append(node)
-	_goblin_cells.append(cell)
-	_goblin_alive.append(true)
-	node.visible = true
-	node.global_position = Grid.cell_to_world(cell)
+	var node: Goblin = GOBLIN_SCENE.instantiate() as Goblin
+	node.setup(cell)
+	add_child(node)
+	_goblins.append(node)
 
 func _spawn_zombie_at(cell: Vector2i) -> void:
-	var node := Node2D.new()
-	node.name = "Zombie"
-	var s := Sprite2D.new()
-	s.centered = false
-	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	s.texture = ZOMBIE_TEX_1
-	node.add_child(s)
+	var node: Zombie = ZOMBIE_SCENE.instantiate() as Zombie
+	node.setup(cell)
 	add_child(node)
-	_zombie_nodes.append(node)
-	_zombie_cells.append(cell)
-	_zombie_alive.append(true)
-	_zombie_hp.append(1)
-	node.visible = true
-	node.global_position = Grid.cell_to_world(cell)
+	_zombies.append(node)
 
 func _spawn_minotaur_at(cell: Vector2i) -> void:
-	var node := Node2D.new()
-	node.name = "Minotaur"
-	var s := Sprite2D.new()
-	s.centered = false
-	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	s.texture = MINO_TEX_1
-	node.add_child(s)
+	var node: Minotaur = MINOTAUR_SCENE.instantiate() as Minotaur
+	node.setup(cell)
 	add_child(node)
-	_minotaur_nodes.append(node)
-	_minotaur_cells.append(cell)
-	_minotaur_alive.append(true)
-	_minotaur_hp.append(2)
-	node.visible = true
-	node.global_position = Grid.cell_to_world(cell)
+	_minotaurs.append(node)
 
-func _clear_extra_goblins() -> void:
-	for child in get_children():
-		if child is Node2D and child.name.begins_with("GoblinExtra"):
-			child.queue_free()
+func _clear_enemies() -> void:
+	for child: Goblin in _goblins:
+		child.queue_free()
+	for child: Zombie in _zombies:
+		child.queue_free()
+	for child: Minotaur in _minotaurs:
+		child.queue_free()
+	_goblins.clear()
+	_zombies.clear()
+	_minotaurs.clear()
+
+func _reset_items_visibility() -> void:
+	if _key_node:
+		_key_node.collected = _key_collected
+		_key_node.visible = not _key_collected
+	if _sword_node:
+		_sword_node.collected = _sword_collected
+		_sword_node.visible = not _sword_collected
+	if _shield_node:
+		_shield_node.collected = _shield_collected
+		_shield_node.visible = not _shield_collected
+	if _potion_node:
+		_potion_node.collected = _potion_collected
+		_potion_node.visible = not _potion_collected
+	if _potion2_node:
+		_potion2_node.collected = _potion2_collected
+		_potion2_node.visible = _level >= 2 and not _potion2_collected
+	if _codex_node:
+		var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
+		_codex_node.collected = not special_uncollected
+		_codex_node.visible = special_uncollected
+	if _torch_node:
+		_torch_node.collected = _torch_collected
+		_torch_node.visible = (_level == _torch_target_level) and not _torch_collected
+	if _rune1_node:
+		_rune1_node.collected = _rune1_collected
+		_rune1_node.visible = _level >= 2 and not _rune1_collected
+	if _rune2_node:
+		_rune2_node.collected = _rune2_collected
+		_rune2_node.visible = _level >= 2 and not _rune2_collected
 
 func _clear_bones() -> void:
 	for child in _decor.get_children():
@@ -1151,7 +983,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 		var attempts := 0
 		while attempts < 2000:
 			attempts += 1
-			var c := _random_interior_cell(grid_size)
+			var c := _level_builder.random_interior_cell(grid_size)
 			var key := "%d,%d" % [c.x, c.y]
 			if used.has(key):
 				continue
@@ -1159,19 +991,15 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell:
 				continue
-			var clash := false
-			for j in range(_goblin_cells.size()):
-				if c == _goblin_cells[j]:
-					clash = true
-					break
-			if clash:
+			if _get_enemy_at(c) != null:
 				continue
 			# Place a bones sprite
 			var s := Sprite2D.new()
 			s.texture = BONE_TEXTURES[_rng.randi_range(0, BONE_TEXTURES.size() - 1)]
 			s.centered = false
 			s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			s.modulate = Color(1, 1, 1, 0.75)
+			var bone_alpha := _rng.randf_range(BONE_ALPHA_MIN, BONE_ALPHA_MAX)
+			s.modulate = Color(1, 1, 1, bone_alpha)
 			# bones: 50% chance to flip horizontally
 			s.flip_h = (_rng.randi_range(0, 1) == 1)
 			s.global_position = Grid.cell_to_world(c)
@@ -1256,12 +1084,12 @@ func _load_next_level() -> void:
 	_crown_collected = false
 	_door_is_open = false
 	# Clear and rebuild world
-	_clear_extra_goblins()
+	_clear_enemies()
 	floor_map.clear()
 	walls_map.clear()
 	var grid_size := _get_grid_size()
 	_grid_size = grid_size
-	_build_test_map(grid_size)
+	_build_maps(grid_size)
 	_ensure_fov_overlay()
 	_place_random_inner_walls(grid_size)
 	# Start near a wall for variety and to avoid center artifacts
@@ -1344,69 +1172,6 @@ func _update_hud_hearts() -> void:
 		tr.stretch_mode = TextureRect.STRETCH_KEEP
 		_hud_hearts.add_child(tr)
 
-func _leave_goblin_corpse(cell: Vector2i) -> void:
-	if _decor == null:
-		return
-	var s := Sprite2D.new()
-	s.texture = DEAD_GOBLIN_TEX
-	s.centered = false
-	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	s.global_position = Grid.cell_to_world(cell)
-	_decor.add_child(s)
-
-func _leave_zombie_corpse(cell: Vector2i) -> void:
-	if _decor == null:
-		return
-	var s := Sprite2D.new()
-	s.texture = ZOMBIE_TEX_2
-	s.centered = false
-	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	s.global_position = Grid.cell_to_world(cell)
-	_decor.add_child(s)
-
-func _leave_minotaur_corpse(cell: Vector2i) -> void:
-	if _decor == null:
-		return
-	var s := Sprite2D.new()
-	s.texture = MINO_TEX_2
-	s.centered = false
-	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	s.global_position = Grid.cell_to_world(cell)
-	_decor.add_child(s)
-
-func _randomize_floor_wall_transform(tm: TileMap, cell: Vector2i) -> void:
-	# Random transform for floor/wall: identity, 90, 180, 270 rotation or horizontal/vertical flip
-	var choice := _rng.randi_range(0, 5)
-	var flip_h := false
-	var flip_v := false
-	var transpose := false
-	match choice:
-		0:
-			pass # identity
-		1:
-			# rotate 90 deg
-			transpose = true
-			flip_h = true
-		2:
-			# rotate 180 deg
-			flip_h = true
-			flip_v = true
-		3:
-			# rotate 270 deg
-			transpose = true
-			flip_v = true
-		4:
-			# flip horizontally
-			flip_h = true
-		5:
-			# flip vertically
-			flip_v = true
-	var td := tm.get_cell_tile_data(0, cell)
-	if td != null:
-		td.flip_h = flip_h
-		td.flip_v = flip_v
-		td.transpose = transpose
-
 func _blink_node(ci: CanvasItem) -> void:
 	if ci == null:
 		return
@@ -1476,25 +1241,14 @@ func is_passable(cell: Vector2i) -> bool:
 	return cell == _door_cell
 
 func _place_random_inner_walls(grid_size: Vector2i) -> void:
-	var count := _rng.randi_range(50, 250)
-	var placed := 0
-	var attempts := 0
 	var player_cell := Grid.world_to_cell(player.global_position)
-	while placed < count and attempts < count * 20:
-		attempts += 1
-		var c := _random_interior_cell(grid_size)
-		var blocked := (c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell)
-		for j in range(_goblin_cells.size()):
-			if c == _goblin_cells[j]:
-				blocked = true
-				break
-		if blocked:
-			continue
-		if _is_wall(c):
-			continue
-		var wsid: int = SOURCES_WALL[_rng.randi_range(0, SOURCES_WALL.size() - 1)]
-		walls_map.set_cell(0, c, wsid, TILE_WALL)
-		placed += 1
+	var is_blocked := func(c: Vector2i) -> bool:
+		if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell:
+			return true
+		if _get_enemy_at(c) != null:
+			return true
+		return false
+	_level_builder.place_random_inner_walls(grid_size, walls_map, SOURCES_WALL, TILE_WALL, is_blocked)
 
 func _is_wall(cell: Vector2i) -> bool:
 	return walls_map.get_cell_source_id(0, cell) != -1
@@ -1503,7 +1257,13 @@ func _in_interior(cell: Vector2i) -> bool:
 	return cell.x >= 1 and cell.y >= 1 and cell.x < _grid_size.x - 1 and cell.y < _grid_size.y - 1
 
 func _is_free(cell: Vector2i) -> bool:
-	return _in_interior(cell) and not _is_wall(cell)
+	return _in_interior(cell) and not _is_wall(cell) and _get_enemy_at(cell) == null
+
+func _can_enemy_step(cell: Vector2i, mover: Enemy) -> bool:
+	if not _in_interior(cell) or _is_wall(cell):
+		return false
+	var occupant := _get_enemy_at(cell)
+	return occupant == null or occupant == mover
 
 func _has_free_neighbor(cell: Vector2i) -> bool:
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
@@ -1518,6 +1278,19 @@ func _place_player(cell: Vector2i) -> void:
 		player.teleport_to_cell(cell)
 	else:
 		player.global_position = Grid.cell_to_world(cell)
+
+func _make_item_node(item_name: String, tex_path: String) -> Item:
+	var tex := _try_load_tex(tex_path)
+	var item := Item.new()
+	item.name = item_name
+	item.item_type = item_name
+	var s := Sprite2D.new()
+	s.centered = false
+	s.texture = tex
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.z_index = 1
+	item.add_child(s)
+	return item
 
 
 func _pick_free_cell_next_to_wall(grid_size: Vector2i) -> Vector2i:
@@ -1557,20 +1330,15 @@ func _setup_input() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = key_code
 			InputMap.action_add_event(name, ev)
-func _get_goblin_index_at(cell: Vector2i) -> int:
-	for i in range(_goblin_cells.size()):
-		if _goblin_alive.size() > i and _goblin_alive[i] and _goblin_cells[i] == cell:
-			return i
-	return -1
 
-func _get_zombie_index_at(cell: Vector2i) -> int:
-	for i in range(_zombie_cells.size()):
-		if _zombie_alive.size() > i and _zombie_alive[i] and _zombie_cells[i] == cell:
-			return i
-	return -1
-
-func _get_minotaur_index_at(cell: Vector2i) -> int:
-	for i in range(_minotaur_cells.size()):
-		if _minotaur_alive.size() > i and _minotaur_alive[i] and _minotaur_cells[i] == cell:
-			return i
-	return -1
+func _get_enemy_at(cell: Vector2i) -> Enemy:
+	for g: Goblin in _goblins:
+		if g.alive and g.grid_cell == cell:
+			return g
+	for z: Zombie in _zombies:
+		if z.alive and z.grid_cell == cell:
+			return z
+	for m: Minotaur in _minotaurs:
+		if m.alive and m.grid_cell == cell:
+			return m
+	return null
