@@ -30,3 +30,4 @@ window/size/window_height=1024
 textures/default_filters/filter=false
 textures/default_filters/mipmaps=false
 2d/snap/use_gpu_pixel_snap=true
+environment/default_clear_color=Color(0, 0, 0, 1)
