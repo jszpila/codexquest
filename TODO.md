@@ -7,6 +7,8 @@
     - [ ] Randomize size
     - [ ] How to scale, populate enemies?
 - [ ] Pick-up animation/splash  
+- [ ] Integrate additional wall/floor tiles sets.
+    - [ ] Mix sets, or select one per level?   
 - [ ] Ranged weapon (wand? arrows?)  
 - [ ] Ranged enemy
 - [ ] Armor pick-up w/ meter
