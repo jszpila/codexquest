@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
-		<title>$GODOT_PROJECT_NAME</title>
+		<title>CHASM OF BELLIGERENCE</title>
 		<style>
 html, body, #canvas {
 	margin: 0;
@@ -93,6 +93,34 @@ body {
 	text-align: center;
 	z-index: 1;
 }
+
+.text-content {
+	max-width: 768px;
+	margin: 1rem auto 0 auto;
+	text-align: left;
+}
+
+.text-content h1 {
+	text-align: center;
+}
+
+.text-content h2 {
+	margin-bottom: 0.25rem;
+}
+
+.text-content ul {
+	padding: 0;
+	margin: 0 0 0 1rem;
+}
+
+.flex-container {
+	display: flex;
+	justify-content: center;
+}
+
+.flex-item{
+	flex: 1
+}
 		</style>
 		$GODOT_HEAD_INCLUDE
 	</head>
@@ -101,10 +129,30 @@ body {
 			<canvas id="canvas">
 				Your browser does not support the canvas tag.
 			</canvas>
-			<h1>CODEX QUEST</h1>
-			<p>You have been thrown down a hole into a pit full of goblins. Find your way out, and the treasures and keys along the way!</p>
-			<h2>Controls</h2>
-			<p>WASD to move; Z to change zoom level.</p>
+			<div class="text-content">
+			<h1>CHASM OF BELLIGERENCE</h1>
+			<p>For reasons known only to you, you have been thrown down a hole into the pit full of goblins, and who knows what else, known as <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must find the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
+			<div class="flex-container">
+				<div class="flex-item">
+					<h2>Controls</h2>
+					<ul>
+						<li>WASD to move</li>
+						<li>Q to use healing potion</li>
+						<li>Z to change zoom level</li>
+					</ul>
+				</div>
+				<div class="flex-item">
+					<h2>Stuff</h2>
+					<ul>
+						<li>The <strong>Sword</strong> grants a +1 attack bonus.</li>
+						<li>The <strong>Shield</strong> grants a +1 defense bonus.</li>
+						<li><strong>Health Potions</strong> restore 1 HP; you can carry 1 at a time.</li>
+						<li><strong>Runes</strong> grant defense or attack bonuses, depending on type.</li>
+						<li>The <strong>Torch</strong> improves visibility.</li>
+					</ul>
+			</div>
+
+			</div>
 		</div>
 		<noscript>
 			Your browser does not support JavaScript.

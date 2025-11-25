@@ -100,6 +100,8 @@ var _sheet_tex_cache := {}
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDRingIcon
 @onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDPotionIcon
+@onready var _hud_atk_label: Label = $HUD/HUDBar/HUDStats/HUDATKLabel
+@onready var _hud_def_label: Label = $HUD/HUDBar/HUDStats/HUDDEFLabel
 @onready var _hud_score: Label = $HUD/HUDBar/HUDScore
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Item = $Key
@@ -1042,14 +1044,8 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 	while true:
 		var player_roll: int = _rng.randi_range(1, 20)
 		var enemy_roll: int = _rng.randi_range(1, 20)
-		if _sword_collected:
-			player_roll += 1
-		if _has_rune1():
-			player_roll += 1
-		if _shield_collected:
-			enemy_roll -= 1
-		if _has_rune2():
-			enemy_roll -= 1
+		player_roll += _attack_bonus()
+		enemy_roll -= _defense_bonus()
 		print("Player rolls ", player_roll, ", ", enemy.enemy_type, " rolls ", enemy_roll)
 		if player_roll == enemy_roll:
 			if force_outcome:
@@ -1211,6 +1207,22 @@ func _has_rune1() -> bool:
 
 func _has_rune2() -> bool:
 	return _rune2_collected_count > 0
+
+func _attack_bonus() -> int:
+	var bonus := 0
+	if _sword_collected:
+		bonus += 1
+	if _has_rune1():
+		bonus += 1
+	return bonus
+
+func _defense_bonus() -> int:
+	var bonus := 0
+	if _shield_collected:
+		bonus += 1
+	if _has_rune2():
+		bonus += 1
+	return bonus
 
 func _apply_restored_items() -> void:
 	if _key_node:
@@ -2101,6 +2113,12 @@ func _update_hud_icons() -> void:
 	if _hud_icon_potion and POTION_TEX:
 		_hud_icon_potion.texture = POTION_TEX
 	_set_icon_visible(_hud_icon_potion, show and _carried_potion)
+	if _hud_atk_label:
+		_hud_atk_label.visible = show
+		_hud_atk_label.text = "ATK: %d" % _attack_bonus()
+	if _hud_def_label:
+		_hud_def_label.visible = show
+		_hud_def_label.text = "DEF: %d" % _defense_bonus()
 	if _hud_score:
 		_hud_score.visible = show
 		_hud_score.text = "Score: %d" % _score
