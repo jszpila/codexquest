@@ -99,6 +99,7 @@ var _sheet_tex_cache := {}
 @onready var _hud_icon_rune2: TextureRect = $HUD/HUDBar/HUDItems/HUDRune2Icon
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDRingIcon
+@onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDPotionIcon
 @onready var _hud_score: Label = $HUD/HUDBar/HUDScore
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Item = $Key
@@ -281,6 +282,7 @@ var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
 var _won: bool = false
 var _score: int = 0
+var _carried_potion: bool = false
 var _goblins: Array[Goblin] = []
 var _zombies: Array[Zombie] = []
 var _minotaurs: Array[Minotaur] = []
@@ -363,6 +365,8 @@ func _process(_delta: float) -> void:
 			_show_game_over(_won)
 			_set_world_visible(false)
 		return
+	if Input.is_action_just_pressed("use_potion"):
+		_try_use_potion()
 	# proceed with gameplay checks
 	# Simple collision checks on grid
 	var on_entrance := (_level > 1 and cp == _entrance_cell)
@@ -414,30 +418,8 @@ func _process(_delta: float) -> void:
 			_update_player_sprite_appearance()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
-	# Potions (supports two on level 2+); only pick up if below max HP
-		var consumed := false
-		if cp == _potion_cell and not _potion_collected:
-			if _hp_current < _hp_max:
-				_potion_collected = true
-				if _potion_node:
-					_potion_node.collect()
-				consumed = true
-			else:
-				print("[DEBUG] On potion1 but at max HP; not consuming")
-		elif _level >= 2 and cp == _potion2_cell and not _potion2_collected:
-			if _hp_current < _hp_max:
-				_potion2_collected = true
-				if _potion2_node:
-					_potion2_node.collect()
-				consumed = true
-			else:
-				print("[DEBUG] On potion2 but at max HP; not consuming")
-		if consumed:
-			_hp_current = min(_hp_max, _hp_current + 1)
-			print("GOT POTION (+1 HP)")
-			_update_hud_hearts()
-			_play_sfx(SFX_PICKUP1)
-			_blink_node(player)
+	# Potions (supports two on level 2+); collect into inventory if available and not already carrying one
+		_pickup_potion_if_available(cp)
 	# Special pickups (codex, crown, ring)
 	var st := _current_level_special_type()
 	if st == &"codex" and not _codex_collected and cp == _codex_cell:
@@ -557,30 +539,7 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 			_move_homing_enemy(mino)
 	_update_fov()
 	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
-	if not _potion_collected and new_cell == _potion_cell:
-		if _hp_current < _hp_max:
-			print("[DEBUG] On potion1 cell via moved. hp=", _hp_current, "/", _hp_max)
-			_potion_collected = true
-			if _potion_node:
-				_potion_node.visible = false
-			_hp_current = min(_hp_max, _hp_current + 1)
-			_update_hud_hearts()
-			_play_sfx(SFX_PICKUP1)
-			_blink_node(player)
-		else:
-			print("[DEBUG] On potion1 via moved but at max HP; not consuming")
-	elif _level >= 2 and not _potion2_collected and new_cell == _potion2_cell:
-		if _hp_current < _hp_max:
-			print("[DEBUG] On potion2 cell via moved. hp=", _hp_current, "/", _hp_max)
-			_potion2_collected = true
-			if _potion2_node:
-				_potion2_node.visible = false
-			_hp_current = min(_hp_max, _hp_current + 1)
-			_update_hud_hearts()
-			_play_sfx(SFX_PICKUP1)
-			_blink_node(player)
-		else:
-			print("[DEBUG] On potion2 via moved but at max HP; not consuming")
+	_pickup_potion_if_available(new_cell)
 
 func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 	var dest: Vector2i = goblin.grid_cell + dir
@@ -982,6 +941,7 @@ func _restart_game() -> void:
 	_key3_icon_persistent = false
 	_codex_icon_persistent = false
 	_crown_icon_persistent = false
+	_carried_potion = false
 	_entrance_rearm = false
 	_score = 0
 	_door_is_open = false
@@ -1577,6 +1537,7 @@ func _start_game() -> void:
 	_key2_icon_persistent = false
 	_codex_icon_persistent = false
 	_crown_icon_persistent = false
+	_carried_potion = false
 	_entrance_rearm = false
 	_exit_rearm = false
 	_hp_current = _hp_max
@@ -2137,9 +2098,44 @@ func _update_hud_icons() -> void:
 	if _hud_icon_ring and RING_TEX:
 		_hud_icon_ring.texture = RING_TEX
 	_set_icon_visible(_hud_icon_ring, show and _ring_collected)
+	if _hud_icon_potion and POTION_TEX:
+		_hud_icon_potion.texture = POTION_TEX
+	_set_icon_visible(_hud_icon_potion, show and _carried_potion)
 	if _hud_score:
 		_hud_score.visible = show
 		_hud_score.text = "Score: %d" % _score
+
+func _pickup_potion_if_available(cell: Vector2i) -> void:
+	if _carried_potion:
+		return
+	var picked := false
+	if cell == _potion_cell and not _potion_collected:
+		_potion_collected = true
+		picked = true
+		if _potion_node:
+			_potion_node.collect()
+	if _level >= 2 and cell == _potion2_cell and not _potion2_collected:
+		_potion2_collected = true
+		picked = true
+		if _potion2_node:
+			_potion2_node.collect()
+	if picked:
+		_carried_potion = true
+		_play_sfx(SFX_PICKUP1)
+		_blink_node(player)
+		_update_hud_icons()
+
+func _try_use_potion() -> void:
+	if not _carried_potion:
+		return
+	if _hp_current >= _hp_max:
+		return
+	_carried_potion = false
+	_hp_current = min(_hp_max, _hp_current + 1)
+	_update_hud_hearts()
+	_update_hud_icons()
+	_play_sfx(SFX_PICKUP1)
+	_blink_node(player)
 
 func _apply_trap_damage() -> void:
 	if _game_over:
@@ -2242,6 +2238,8 @@ func _set_level_item_textures() -> void:
 		_hud_icon_torch.texture = TORCH_TEX
 	if _hud_icon_ring and RING_TEX:
 		_hud_icon_ring.texture = RING_TEX
+	if _hud_icon_potion and POTION_TEX:
+		_hud_icon_potion.texture = POTION_TEX
 
 func is_passable(cell: Vector2i) -> bool:
 	# Allow stepping onto the door cell only when it is actually open
@@ -2340,6 +2338,7 @@ func _setup_input() -> void:
 		["toggle_zoom", [Key.KEY_Z]],
 		["restart", [Key.KEY_SPACE, Key.KEY_ENTER]],
 		["start", [Key.KEY_ENTER]],
+		["use_potion", [Key.KEY_Q]],
 	]
 	for pair in mapping:
 		var name: String = pair[0]
