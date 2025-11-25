@@ -1589,7 +1589,8 @@ func _start_game() -> void:
 func _show_title(visible: bool) -> void:
 	_title_layer.visible = visible
 	_over_layer.visible = false
-	_title_label.add_theme_font_size_override("font_size", 48)
+	_title_label.add_theme_font_size_override("font_size", 64)
+	_title_label.offset_top = 512.0
 
 func _show_game_over(won: bool) -> void:
 	_over_layer.visible = true
@@ -1739,25 +1740,19 @@ func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 
 func _spawn_goblin_at(cell: Vector2i) -> void:
 	var node: Goblin = GOBLIN_SCENE.instantiate() as Goblin
-	node.setup(cell)
-	node.corpse_texture = DEAD_GOBLIN_TEX
-	_set_sprite_tex(node, GOBLIN_TEX_1)
+	node.setup(cell, GOBLIN_TEX_1, DEAD_GOBLIN_TEX)
 	add_child(node)
 	_goblins.append(node)
 
 func _spawn_zombie_at(cell: Vector2i) -> void:
 	var node: Zombie = ZOMBIE_SCENE.instantiate() as Zombie
-	node.setup(cell)
-	node.corpse_texture = ZOMBIE_TEX_2
-	_set_sprite_tex(node, ZOMBIE_TEX_1)
+	node.setup(cell, ZOMBIE_TEX_1, ZOMBIE_TEX_2)
 	add_child(node)
 	_zombies.append(node)
 
 func _spawn_minotaur_at(cell: Vector2i) -> void:
 	var node: Minotaur = MINOTAUR_SCENE.instantiate() as Minotaur
-	node.setup(cell)
-	node.corpse_texture = MINO_TEX_2
-	_set_sprite_tex(node, MINO_TEX_1)
+	node.setup(cell, MINO_TEX_1, MINO_TEX_2)
 	add_child(node)
 	_minotaurs.append(node)
 

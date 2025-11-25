@@ -1,22 +1,21 @@
-[gd_scene load_steps=18 format=3 uid="uid://bof05ivffmn5u"]
+[gd_scene load_steps=11 format=3 uid="uid://bof05ivffmn5u"]
 
 [ext_resource type="Script" uid="uid://s5pbhuqwkwq4" path="res://scripts/Main.gd" id="1"]
 [ext_resource type="TileSet" uid="uid://tayrg5g1nh5u" path="res://tiles/Sprites.tileset.tres" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="3"]
 [ext_resource type="Script" uid="uid://chd0omw48s33h" path="res://scripts/PixelScaler.gd" id="4"]
-[ext_resource type="Texture2D" uid="uid://ojsa1cwutvr1" path="res://assets/key-1.png" id="5"]
 [ext_resource type="FontFile" uid="uid://lcsi3iekfbl5" path="res://assets/DungeonFont.ttf" id="6"]
 [ext_resource type="Texture2D" uid="uid://bhg4ca6sfvhf4" path="res://assets/CoB-title.png" id="7"]
 [ext_resource type="Texture2D" uid="uid://c2rxob573x2am" path="res://assets/codex-quest-win.png" id="8"]
 [ext_resource type="Texture2D" uid="uid://l3gvmh8f4b6k" path="res://assets/codex-quest-lose.png" id="9"]
-[ext_resource type="Texture2D" uid="uid://dtpwpu3mi80fi" path="res://assets/sword.png" id="10"]
-[ext_resource type="Texture2D" uid="uid://dr7hgynepi5no" path="res://assets/shield.png" id="11"]
-[ext_resource type="Texture2D" uid="uid://clc2i6vyqn6km" path="res://assets/potion.png" id="12"]
-[ext_resource type="Texture2D" uid="uid://rmqo6tntxmhq" path="res://assets/codex.png" id="13"]
-[ext_resource type="Texture2D" uid="uid://b0g7h3ud5uan4" path="res://assets/rune-1.png" id="14"]
-[ext_resource type="Texture2D" uid="uid://d2misqo66cl05" path="res://assets/rune-2.png" id="15"]
-[ext_resource type="Texture2D" uid="uid://bwwml4mqltpf3" path="res://assets/torch.png" id="16"]
 [ext_resource type="Script" uid="uid://by1ivrwoxrbkv" path="res://scripts/Item.gd" id="17"]
+
+[sub_resource type="LabelSettings" id="1"]
+font = ExtResource("6")
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_offset = Vector2(2, 2)
+shadow_size = 2
+font_size = 84
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -95,7 +94,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("5")
 expand_mode = 1
 stretch_mode = 5
 
@@ -104,7 +102,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("5")
 expand_mode = 1
 stretch_mode = 5
 
@@ -121,7 +118,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("10")
 expand_mode = 1
 stretch_mode = 5
 
@@ -130,7 +126,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("11")
 expand_mode = 1
 stretch_mode = 5
 
@@ -139,7 +134,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("13")
 expand_mode = 1
 stretch_mode = 5
 
@@ -148,7 +142,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("13")
 expand_mode = 1
 stretch_mode = 5
 
@@ -157,7 +150,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("14")
 expand_mode = 1
 stretch_mode = 5
 
@@ -166,7 +158,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("15")
 expand_mode = 1
 stretch_mode = 5
 
@@ -175,7 +166,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("16")
 expand_mode = 1
 stretch_mode = 5
 
@@ -192,7 +182,6 @@ visible = false
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
-texture = ExtResource("12")
 expand_mode = 1
 stretch_mode = 5
 
@@ -253,18 +242,14 @@ grow_vertical = 2
 color = Color(0, 0, 0, 0)
 
 [node name="HUDLineLeft" type="ColorRect" parent="HUD"]
-anchors_preset = 0
-anchor_right = 0.0
-anchor_bottom = 0.0
 offset_right = 1.0
 offset_bottom = 64.0
 color = Color(0.4, 0.4, 0.4, 1)
 
 [node name="HUDLineRight" type="ColorRect" parent="HUD"]
-anchors_preset = 0
+anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.0
 offset_left = -1.0
 offset_bottom = 64.0
 color = Color(0.4, 0.4, 0.4, 1)
@@ -295,8 +280,9 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "Press Enter to start"
 theme_override_fonts/font = ExtResource("6")
+label_settings = SubResource("1")
+text = "Press Enter to start"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -329,8 +315,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "Press Enter to restart"
 theme_override_fonts/font = ExtResource("6")
+text = "Press Enter to restart"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -350,33 +336,28 @@ vertical_alignment = 1
 script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Key"]
-texture = ExtResource("5")
 centered = false
 
 [node name="Sword" type="Node2D" parent="."]
 script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Sword"]
-texture = ExtResource("10")
 centered = false
 
 [node name="Shield" type="Node2D" parent="."]
 script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Shield"]
-texture = ExtResource("11")
 centered = false
 
 [node name="Potion" type="Node2D" parent="."]
 script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Potion"]
-texture = ExtResource("12")
 centered = false
 
 [node name="Codex" type="Node2D" parent="."]
 script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Codex"]
-texture = ExtResource("13")
 centered = false
