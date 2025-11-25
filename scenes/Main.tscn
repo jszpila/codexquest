@@ -161,6 +161,14 @@ size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
 
+[node name="HUDRune3Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
+visible = false
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
 [node name="HUDTorchIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
 custom_minimum_size = Vector2(36, 36)
