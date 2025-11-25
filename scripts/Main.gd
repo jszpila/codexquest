@@ -33,6 +33,7 @@ const SFX_PICKUP2: AudioStream = preload("res://assets/pickup-2.wav")
 const SFX_HURT1: AudioStream = preload("res://assets/hurt-1.wav")
 const SFX_HURT2: AudioStream = preload("res://assets/hurt-2.wav")
 const SFX_HURT3: AudioStream = preload("res://assets/hurt-3.wav")
+const SFX_LEVEL_UP: AudioStream = preload("res://assets/level-up.wav")
 const SFX_MR_BONES: AudioStream = preload("res://assets/mr-bones.wav")
 const SFX_DOOR_OPEN: AudioStream = preload("res://assets/door-open.wav")
 const SFX_START: AudioStream = preload("res://assets/start.wav")
@@ -44,6 +45,8 @@ const FLOOR_ALPHA_MAX := 1.0
 const BONE_ALPHA_MIN := 1.0
 const BONE_ALPHA_MAX := 1.0
 const ARMOR_MAX := 3
+const LEVEL_UP_SCORE_STEP := 10
+const HP_MAX_LIMIT := 10
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -291,6 +294,9 @@ var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
 var _won: bool = false
 var _score: int = 0
+var _next_level_score: int = LEVEL_UP_SCORE_STEP
+var _attack_level_bonus: int = 0
+var _defense_level_bonus: int = 0
 var _carried_potion: bool = false
 var _goblins: Array[Goblin] = []
 var _zombies: Array[Zombie] = []
@@ -521,7 +527,7 @@ func _process(_delta: float) -> void:
 			if r3 != null and not r3.collected and cp == r3.grid_cell:
 				_rune3_collected_count += 1
 				print("GOT RUNE-3 (+1 MAX HP)")
-				_hp_max += 1
+				_hp_max = min(HP_MAX_LIMIT, _hp_max + 1)
 				if _hp_current < _hp_max:
 					_hp_current = min(_hp_max, _hp_current + 1)
 				_update_hud_hearts()
@@ -1012,6 +1018,9 @@ func _restart_game() -> void:
 	_carried_potion = false
 	_entrance_rearm = false
 	_score = 0
+	_next_level_score = LEVEL_UP_SCORE_STEP
+	_attack_level_bonus = 0
+	_defense_level_bonus = 0
 	_door_is_open = false
 	_hp_max = 3
 	_hp_current = _hp_max
@@ -1150,7 +1159,32 @@ func _enemy_score_value(enemy: Enemy) -> int:
 
 func _add_score(amount: int) -> void:
 	_score += amount
+	_maybe_level_up()
 	_update_hud_icons()
+
+func _maybe_level_up() -> void:
+	while _score >= _next_level_score:
+		_apply_level_up_reward()
+		_next_level_score += LEVEL_UP_SCORE_STEP
+
+func _apply_level_up_reward() -> void:
+	var roll := _rng.randf()
+	if roll < 0.4:
+		_attack_level_bonus += 1
+		print("LEVEL UP: +1 ATK (bonus=", _attack_level_bonus, ")")
+	elif roll < 0.8:
+		_defense_level_bonus += 1
+		print("LEVEL UP: +1 DEF (bonus=", _defense_level_bonus, ")")
+	else:
+		if _hp_max < HP_MAX_LIMIT:
+			_hp_max = min(HP_MAX_LIMIT, _hp_max + 1)
+		print("LEVEL UP: +1 MAX HP (max=", _hp_max, ")")
+	if _hp_current < _hp_max:
+		_hp_current = min(_hp_max, _hp_current + 1)
+	_update_hud_hearts()
+	_update_hud_icons()
+	_play_sfx(SFX_LEVEL_UP)
+	_blink_node_colored(player, Color(0.776, 0.624, 0.153))
 
 func _leave_enemy_corpse(enemy: Enemy) -> void:
 	if _decor == null or enemy == null:
@@ -1301,6 +1335,7 @@ func _attack_bonus() -> int:
 		bonus += 1
 	if _has_rune1():
 		bonus += 1
+	bonus += _attack_level_bonus
 	return bonus
 
 func _defense_bonus() -> int:
@@ -1309,6 +1344,7 @@ func _defense_bonus() -> int:
 		bonus += 1
 	if _has_rune2():
 		bonus += 1
+	bonus += _defense_level_bonus
 	return bonus
 
 func _apply_restored_items() -> void:
@@ -1670,6 +1706,9 @@ func _start_game() -> void:
 	_carried_potion = false
 	_entrance_rearm = false
 	_exit_rearm = false
+	_next_level_score = LEVEL_UP_SCORE_STEP
+	_attack_level_bonus = 0
+	_defense_level_bonus = 0
 	_hp_max = 3
 	_hp_current = _hp_max
 	_torch_target_level = _rng.randi_range(1, _max_level)
@@ -2344,12 +2383,17 @@ func _update_hud_armor() -> void:
 		_hud_armor.add_child(tr)
 
 func _blink_node(ci: CanvasItem) -> void:
+	_blink_node_colored(ci, Color(1, 1, 1, 1))
+
+func _blink_node_colored(ci: CanvasItem, color: Color) -> void:
 	if ci == null:
 		return
+	ci.modulate = Color(color.r, color.g, color.b, 1.0)
 	var t := get_tree().create_tween()
 	for i in range(3):
 		t.tween_property(ci, "modulate:a", 0.2, 0.06)
 		t.tween_property(ci, "modulate:a", 1.0, 0.06)
+	t.finished.connect(func(): ci.modulate = Color(1, 1, 1, 1))
 
 func _play_sfx(stream: AudioStream) -> void:
 	if stream == null:
