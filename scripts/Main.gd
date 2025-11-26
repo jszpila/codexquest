@@ -23,8 +23,9 @@ const GRID_H := 25 # unused; kept for reference
 
 const TILE_FLOOR: Vector2i = Vector2i(0, 0)
 const TILE_WALL: Vector2i = Vector2i(0, 0)
-const SOURCES_FLOOR: Array[int] = [0, 1, 2, 3]
-const SOURCES_WALL: Array[int] = [4, 5, 6, 7, 8]
+const TILESET_A := &"tile_set_a"
+const TILESET_B := &"tile_set_b"
+const TILESET_C := &"tile_set_c"
 const FIXED_GRID_W := 48
 const FIXED_GRID_H := 36
 
@@ -37,6 +38,8 @@ const SFX_LEVEL_UP: AudioStream = preload("res://assets/level-up.wav")
 const SFX_MR_BONES: AudioStream = preload("res://assets/mr-bones.wav")
 const SFX_DOOR_OPEN: AudioStream = preload("res://assets/door-open.wav")
 const SFX_START: AudioStream = preload("res://assets/start.wav")
+const SFX_BOW: AudioStream = preload("res://assets/bow.wav")
+const SFX_WAND: AudioStream = preload("res://assets/wand.wav")
 const SIGHT_INNER_TILES := 5
 const SIGHT_OUTER_TILES := 10
 const SIGHT_MAX_DARK := 0.8
@@ -46,7 +49,13 @@ const BONE_ALPHA_MIN := 1.0
 const BONE_ALPHA_MAX := 1.0
 const ARMOR_MAX := 3
 const LEVEL_UP_SCORE_STEP := 10
-const HP_MAX_LIMIT := 10
+const HP_MAX_LIMIT := 5
+const RANGED_WAND := &"wand"
+const RANGED_BOW := &"bow"
+const RANGED_NONE := &"none"
+const ARROWS_PER_PICKUP := 3
+const SHARED_FLOOR_WEIGHT := 0.15
+const DEBUG_FORCE_RANGED := false
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -82,19 +91,41 @@ var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
 var TRAP_WEB_TEX: Texture2D
 var BRAZIER_TEX: Texture2D
+var WAND_TEX: Texture2D
+var BOW_TEX: Texture2D
+var ARROW_TEX: Texture2D
 var BONE_TEXTURES: Array[Texture2D] = []
 var SPIDERWEB_TEXTURES := {}
-var FLOOR_TEXTURES: Array[Texture2D] = []
-var WALL_TEXTURES: Array[Texture2D] = []
+var FLOOR_TEXTURES_A: Array[Texture2D] = []
+var FLOOR_TEXTURES_B: Array[Texture2D] = []
+var FLOOR_TEXTURES_C: Array[Texture2D] = []
+var FLOOR_TEXTURES_SHARED: Array[Texture2D] = []
+var WALL_TEXTURES_A: Array[Texture2D] = []
+var WALL_TEXTURES_B: Array[Texture2D] = []
+var WALL_TEXTURES_C: Array[Texture2D] = []
+var _floor_sources_by_set := {}
+var _wall_sources_by_set := {}
+var _shared_floor_sources: Array[int] = []
+var _current_floor_sources_base: Array[int] = []
+var _current_floor_sources: Array[int] = []
+var _current_wall_sources: Array[int] = []
+var _tileset_plan := {}
+var _tileset_choices: Array[StringName] = [TILESET_A, TILESET_B, TILESET_C]
 var _sheet_image: Image
 var _sheet_tex_cache := {}
+var _ranged_highlight: StyleBoxFlat
+var _ranged_inactive: StyleBoxFlat
+var _debug_bow_outline: Line2D
+var _debug_wand_outline: Line2D
+var _projectile_pool: Array[Line2D] = []
+var _projectile_active: Array[Line2D] = []
+var _title_textures: Array[Texture2D] = []
 
 @onready var floor_map: TileMap = $Floor
 @onready var walls_map: TileMap = $Walls
 @onready var player: Node2D = $Player
 @onready var _player_sprite: Sprite2D = $Player/Sprite2D
 @onready var _hud_hearts: HBoxContainer = $HUD/HUDBar/HUDVitals/HeartsBorder/Hearts
-@onready var _hud_items: HBoxContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer
 @onready var _hud_icon_key1: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDKey1Icon
 @onready var _hud_icon_key2: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDKey2Icon
 @onready var _hud_icon_key3: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDKey3Icon
@@ -108,16 +139,25 @@ var _sheet_tex_cache := {}
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRingIcon
 @onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDPotionIcon
+@onready var _hud_icon_bow: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot/HUDBowIcon
+@onready var _hud_icon_wand: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot/HUDWandIcon
+@onready var _hud_bow_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot
+@onready var _hud_wand_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot
+@onready var _hud_arrow_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDArrows
 @onready var _hud_armor: HBoxContainer = $HUD/HUDBar/HUDVitals/ArmorBorder/Armor
-@onready var _hud_atk_label: Label = $HUD/HUDBar/HUDStats/HUDATKLabel
-@onready var _hud_def_label: Label = $HUD/HUDBar/HUDStats/HUDDEFLabel
-@onready var _hud_score: Label = $HUD/HUDBar/HUDScore
+@onready var _hud_player_level: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDPlayerLevel
+@onready var _hud_atk_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDATKLabel
+@onready var _hud_def_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDDEFLabel
+@onready var _hud_score: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDScore
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Item = $Key
 @onready var _sword_node: Item = $Sword
 @onready var _shield_node: Item = $Shield
 @onready var _potion_node: Item = $Potion
 @onready var _codex_node: Item = $Codex
+@onready var _bow_node: Item = $Bow
+@onready var _wand_node: Item = $Wand
+@onready var _arrow_base_node: Item = $ArrowPickup
 @onready var _decor: Node2D = $Decor
 @onready var _title_layer: CanvasLayer = $Title
 @onready var _title_label: Label = $Title/TitleLabel
@@ -131,7 +171,7 @@ var _sheet_tex_cache := {}
 @onready var _door_sprite: Sprite2D = $Door/Sprite2D
 @onready var _entrance_door_node: Node2D = $EntranceDoor
 @onready var _entrance_door_sprite: Sprite2D = $EntranceDoor/Sprite2D
-@onready var _hud_level: Label = $HUD/HUDBar/HUDLevel
+@onready var _hud_level: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDLevel
 @export var level_fade_out_time: float = 0.5
 @export var level_fade_in_time: float = 0.5
 @export var level_fade_alpha: float = 0.95
@@ -179,6 +219,22 @@ func _set_sprite_tex(node: Node, tex: Texture2D) -> void:
 	if s:
 		s.texture = tex
 		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		s.modulate = Color(1, 1, 1, 1)
+		s.visible = true
+		s.z_index = 50
+		s.z_as_relative = false
+		s.position = Vector2.ZERO
+
+func _normalize_item_node(item: Item, tex: Texture2D) -> void:
+	if item == null:
+		return
+	item.collected = false
+	item.visible = true
+	item.modulate = Color(1, 1, 1, 1)
+	item.z_index = 10
+	item.z_as_relative = false
+	item.global_position = Grid.cell_to_world(item.grid_cell)
+	_set_sprite_tex(item, tex)
 
 func _load_spritesheet_textures() -> void:
 	PLAYER_TEX_1 = _sheet_tex(&"player1", Vector2i(1352, 0), true)
@@ -217,6 +273,13 @@ func _load_spritesheet_textures() -> void:
 	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
 	TRAP_WEB_TEX = _sheet_tex(&"trap_web", Vector2i(52, 507), true)
 	BRAZIER_TEX = _sheet_tex(&"brazier", Vector2i(351, 286), true)
+	WAND_TEX = _sheet_tex(&"wand", Vector2i(544, 169), true)
+	BOW_TEX = _sheet_tex(&"bow", Vector2i(351, 130), true)
+	ARROW_TEX = _sheet_tex(&"arrow", Vector2i(429, 130), true)
+	_title_textures = [
+		load("res://assets/CoB-title.png"),
+		load("res://assets/cob-title-mb.png")
+	]
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
 		_sheet_tex(&"bone2", Vector2i(13, 494), true),
@@ -228,18 +291,47 @@ func _load_spritesheet_textures() -> void:
 		&"bottom_left": _sheet_tex(&"spiderweb_bottom_left", Vector2i(26, 507), true),
 		&"bottom_right": _sheet_tex(&"spiderweb_bottom_right", Vector2i(39, 507), true),
 	}
-	FLOOR_TEXTURES = [
-		_sheet_tex(&"floor1", Vector2i(130, 65), false),
-		_sheet_tex(&"floor2", Vector2i(143, 65), false),
-		_sheet_tex(&"floor3", Vector2i(156, 65), false),
-		_sheet_tex(&"floor4", Vector2i(117, 65), false),
+	FLOOR_TEXTURES_A = [
+		_sheet_tex(&"tile_set_a_floor_1", Vector2i(130, 65), false),
+		_sheet_tex(&"tile_set_a_floor_2", Vector2i(143, 65), false),
+		_sheet_tex(&"tile_set_a_floor_3", Vector2i(156, 65), false),
+		_sheet_tex(&"tile_set_a_floor_4", Vector2i(117, 65), false),
 	]
-	WALL_TEXTURES = [
-		_sheet_tex(&"wall1", Vector2i(0, 26), false),
-		_sheet_tex(&"wall2", Vector2i(13, 26), false),
-		_sheet_tex(&"wall3", Vector2i(65, 26), false),
-		_sheet_tex(&"wall4", Vector2i(78, 26), false),
-		_sheet_tex(&"wall5", Vector2i(91, 26), false),
+	WALL_TEXTURES_A = [
+		_sheet_tex(&"tile_set_a_wall_1", Vector2i(0, 26), false),
+		_sheet_tex(&"tile_set_a_wall_2", Vector2i(13, 26), false),
+		_sheet_tex(&"tile_set_a_wall_3", Vector2i(65, 26), false),
+		_sheet_tex(&"tile_set_a_wall_4", Vector2i(78, 26), false),
+		_sheet_tex(&"tile_set_a_wall_5", Vector2i(91, 26), false),
+	]
+	FLOOR_TEXTURES_B = [
+		_sheet_tex(&"tile_set_b_floor_1", Vector2i(52, 65), false),
+		_sheet_tex(&"tile_set_b_floor_2", Vector2i(65, 65), false),
+		_sheet_tex(&"tile_set_b_floor_3", Vector2i(78, 65), false),
+		_sheet_tex(&"tile_set_b_floor_4", Vector2i(91, 65), false),
+	]
+	WALL_TEXTURES_B = [
+		_sheet_tex(&"tile_set_b_wall_1", Vector2i(39, 0), false),
+		_sheet_tex(&"tile_set_b_wall_2", Vector2i(52, 0), false),
+		_sheet_tex(&"tile_set_b_wall_3", Vector2i(65, 0), false),
+		_sheet_tex(&"tile_set_b_wall_4", Vector2i(78, 0), false),
+	]
+	FLOOR_TEXTURES_C = [
+		_sheet_tex(&"tile_set_c_floor_1", Vector2i(78, 78), false),
+		_sheet_tex(&"tile_set_c_floor_2", Vector2i(91, 78), false),
+		_sheet_tex(&"tile_set_c_floor_3", Vector2i(130, 78), false),
+		_sheet_tex(&"tile_set_c_floor_4", Vector2i(143, 78), false),
+	]
+	WALL_TEXTURES_C = [
+		_sheet_tex(&"tile_set_c_wall_1", Vector2i(0, 39), false),
+		_sheet_tex(&"tile_set_c_wall_2", Vector2i(13, 39), false),
+		_sheet_tex(&"tile_set_c_wall_3", Vector2i(26, 39), false),
+		_sheet_tex(&"tile_set_c_wall_4", Vector2i(156, 39), false),
+	]
+	FLOOR_TEXTURES_SHARED = [
+		_sheet_tex(&"old_bones_floor_1", Vector2i(0, 91), false),
+		_sheet_tex(&"old_bones_floor_2", Vector2i(13, 91), false),
+		_sheet_tex(&"old_bones_floor_3", Vector2i(26, 91), false),
 	]
 	_sheet_tex_cache[&"mouse_tex"] = mouse_tex
 	_set_sprite_tex(_door_node, DOOR_TEX_1)
@@ -248,17 +340,55 @@ func _load_spritesheet_textures() -> void:
 	_set_sprite_tex(_shield_node, SHIELD_TEX)
 	_set_sprite_tex(_potion_node, POTION_TEX)
 	_set_sprite_tex(_codex_node, CODEX_TEX)
+	_set_sprite_tex(_bow_node, BOW_TEX)
+	_set_sprite_tex(_wand_node, WAND_TEX)
+	_set_sprite_tex(_arrow_base_node, ARROW_TEX)
 	_set_sprite_tex(_player_sprite, PLAYER_TEX_1)
 
 func _build_tileset_from_sheet() -> void:
 	_tileset = TileSet.new()
 	_tileset.tile_size = Vector2i(12, 12)
-	for i in range(FLOOR_TEXTURES.size()):
-		var src := _make_tile_source(FLOOR_TEXTURES[i])
-		_tileset.add_source(src, i)
-	for i in range(WALL_TEXTURES.size()):
-		var src2 := _make_tile_source(WALL_TEXTURES[i])
-		_tileset.add_source(src2, SOURCES_WALL[0] + i)
+	_floor_sources_by_set.clear()
+	_wall_sources_by_set.clear()
+	_shared_floor_sources.clear()
+	var tilesets: Array = [
+		{
+			"id": TILESET_A,
+			"floors": FLOOR_TEXTURES_A,
+			"walls": WALL_TEXTURES_A
+		},
+		{
+			"id": TILESET_B,
+			"floors": FLOOR_TEXTURES_B,
+			"walls": WALL_TEXTURES_B
+		},
+		{
+			"id": TILESET_C,
+			"floors": FLOOR_TEXTURES_C,
+			"walls": WALL_TEXTURES_C
+		},
+	]
+	var next_source_id := 0
+	for ts in tilesets:
+		var floor_sources: Array[int] = []
+		for tex: Texture2D in ts["floors"]:
+			var src := _make_tile_source(tex)
+			_tileset.add_source(src, next_source_id)
+			floor_sources.append(next_source_id)
+			next_source_id += 1
+		_floor_sources_by_set[ts["id"]] = floor_sources
+		var wall_sources: Array[int] = []
+		for tex2: Texture2D in ts["walls"]:
+			var src2 := _make_tile_source(tex2)
+			_tileset.add_source(src2, next_source_id)
+			wall_sources.append(next_source_id)
+			next_source_id += 1
+		_wall_sources_by_set[ts["id"]] = wall_sources
+	for shared_tex in FLOOR_TEXTURES_SHARED:
+		var shared_src := _make_tile_source(shared_tex)
+		_tileset.add_source(shared_src, next_source_id)
+		_shared_floor_sources.append(next_source_id)
+		next_source_id += 1
 	floor_map.tile_set = _tileset
 	walls_map.tile_set = _tileset
 
@@ -269,6 +399,9 @@ var _sword_cell: Vector2i = Vector2i.ZERO
 var _shield_cell: Vector2i = Vector2i.ZERO
 var _potion_cell: Vector2i = Vector2i.ZERO
 var _potion2_cell: Vector2i = Vector2i.ZERO
+var _wand_cell: Vector2i = Vector2i.ZERO
+var _bow_cell: Vector2i = Vector2i.ZERO
+var _arrow_cells: Array[Vector2i] = []
 var _armor_cells: Array[Vector2i] = []
 var _rune1_cells: Array[Vector2i] = []
 var _rune2_cells: Array[Vector2i] = []
@@ -283,6 +416,8 @@ var _sword_collected: bool = false
 var _shield_collected: bool = false
 var _potion_collected: bool = false
 var _potion2_collected: bool = false
+var _wand_collected: bool = false
+var _bow_collected: bool = false
 var _armor_current: int = 0
 var _rune1_collected_count: int = 0
 var _rune2_collected_count: int = 0
@@ -316,6 +451,7 @@ var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
 var _potion2_node: Item
+var _arrow_nodes: Array[Item] = []
 var _armor_nodes: Array[Item] = []
 var _rune1_nodes: Array[Item] = []
 var _rune2_nodes: Array[Item] = []
@@ -345,7 +481,13 @@ var _armor_plan := {} # level -> count
 var _rune1_plan := {} # level -> count
 var _rune2_plan := {}
 var _rune3_plan := {}
+var _arrow_plan := {} # level -> 0/1 arrow pickup
 var _level_states := {}
+var _wand_level: int = 1
+var _bow_level: int = 1
+var _arrow_count: int = 0
+var _active_ranged_weapon: StringName = RANGED_NONE
+var _player_level: int = 0
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -357,6 +499,25 @@ func _ready() -> void:
 	_load_spritesheet_textures()
 	_build_tileset_from_sheet()
 	_rng.randomize()
+	_ranged_highlight = StyleBoxFlat.new()
+	_ranged_highlight.draw_center = false
+	_ranged_highlight.border_color = Color(1, 1, 1, 1)
+	_ranged_highlight.border_width_top = 1
+	_ranged_highlight.border_width_bottom = 1
+	_ranged_highlight.border_width_left = 1
+	_ranged_highlight.border_width_right = 1
+	_ranged_inactive = StyleBoxFlat.new()
+	_ranged_inactive.draw_center = false
+	_ranged_inactive.border_color = Color(1, 1, 1, 0)
+	_ranged_inactive.border_width_top = 1
+	_ranged_inactive.border_width_bottom = 1
+	_ranged_inactive.border_width_left = 1
+	_ranged_inactive.border_width_right = 1
+	if _hud_bow_panel:
+		_hud_bow_panel.add_theme_stylebox_override("panel", null)
+	if _hud_wand_panel:
+		_hud_wand_panel.add_theme_stylebox_override("panel", null)
+	_clear_debug_outlines()
 	_level_builder = LevelBuilder.new(_rng)
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
@@ -405,6 +566,12 @@ func _process(_delta: float) -> void:
 		return
 	if Input.is_action_just_pressed("use_potion"):
 		_try_use_potion()
+	if Input.is_action_just_pressed("switch_ranged"):
+		_cycle_ranged_weapon()
+	var ranged_dir := _ranged_dir_from_input()
+	if ranged_dir != Vector2i.ZERO:
+		if _fire_ranged(ranged_dir):
+			return
 	# proceed with gameplay checks
 	# Simple collision checks on grid
 	var on_entrance := (_level > 1 and cp == _entrance_cell)
@@ -490,6 +657,28 @@ func _process(_delta: float) -> void:
 			_update_player_sprite_appearance()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
+	if not _wand_collected and cp == _wand_cell:
+		_wand_collected = true
+		_wand_cell = Vector2i(-1, -1)
+		_active_ranged_weapon = RANGED_WAND
+		print("GOT WAND")
+		if _wand_node:
+			_wand_node.collect()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
+		_add_score(1)
+		_update_hud_icons()
+	if not _bow_collected and cp == _bow_cell:
+		_bow_collected = true
+		_bow_cell = Vector2i(-1, -1)
+		_active_ranged_weapon = _active_ranged_weapon if _active_ranged_weapon != RANGED_NONE else RANGED_BOW
+		print("GOT BOW")
+		if _bow_node:
+			_bow_node.collect()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
+		_add_score(1)
+		_update_hud_icons()
 	# Torch pickup: extends FOV by +4 for the rest of the run
 	if not _torch_collected and cp == _torch_cell:
 		_torch_collected = true
@@ -576,6 +765,7 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 	_advance_enemies_and_update(skeleton_count_before)
 	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
 	_pickup_potion_if_available(new_cell)
+	_pickup_arrows_if_available(new_cell)
 
 func _on_player_attempt_move() -> bool:
 	if _web_stuck_turns > 0:
@@ -695,13 +885,46 @@ func _get_grid_size() -> Vector2i:
 	# Use a fixed world size (in tiles)
 	return Vector2i(FIXED_GRID_W, FIXED_GRID_H)
 
+func _set_current_tileset_for_level(level: int) -> void:
+	if _tileset_choices.is_empty():
+		_tileset_choices = [TILESET_A]
+	if not _tileset_plan.has(level):
+		var choice: StringName = _tileset_choices[_rng.randi_range(0, _tileset_choices.size() - 1)]
+		_tileset_plan[level] = choice
+	var ts_choice: StringName = _tileset_plan[level]
+	var base_floor_sources: Array = _floor_sources_by_set.get(ts_choice, [])
+	if base_floor_sources.is_empty() and _floor_sources_by_set.has(TILESET_A):
+		base_floor_sources = _floor_sources_by_set[TILESET_A]
+	_current_floor_sources_base = base_floor_sources.duplicate()
+	_current_floor_sources = _build_weighted_floor_sources(_current_floor_sources_base, _shared_floor_sources, SHARED_FLOOR_WEIGHT)
+	var base_wall_sources: Array = _wall_sources_by_set.get(ts_choice, [])
+	if base_wall_sources.is_empty() and _wall_sources_by_set.has(TILESET_A):
+		base_wall_sources = _wall_sources_by_set[TILESET_A]
+	_current_wall_sources = base_wall_sources.duplicate()
+
+func _build_weighted_floor_sources(base_sources: Array, shared_sources: Array, shared_ratio: float) -> Array[int]:
+	if shared_sources.is_empty():
+		return base_sources.duplicate()
+	if base_sources.is_empty():
+		return shared_sources.duplicate()
+	var total_buckets := 100
+	var shared_bucket_count := clampi(int(round(float(total_buckets) * shared_ratio)), 1, total_buckets - 1)
+	var base_bucket_count := total_buckets - shared_bucket_count
+	var weighted: Array[int] = []
+	for i in range(base_bucket_count):
+		weighted.append(base_sources[i % base_sources.size()])
+	for j in range(shared_bucket_count):
+		weighted.append(shared_sources[j % shared_sources.size()])
+	return weighted
+
 func _build_maps(grid_size: Vector2i) -> void:
+	_set_current_tileset_for_level(_level)
 	_level_builder.build_test_map(
 		floor_map,
 		walls_map,
 		grid_size,
-		SOURCES_FLOOR,
-		SOURCES_WALL,
+		_current_floor_sources,
+		_current_wall_sources,
 		TILE_FLOOR,
 		TILE_WALL,
 		FLOOR_ALPHA_MIN,
@@ -776,12 +999,37 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			_shield_node.place(_shield_cell)
 	elif _shield_node:
 		_shield_node.visible = false
+	# Place ranged weapons
+	if _level == _wand_level and not _wand_collected:
+		var wand_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+		_wand_cell = _level_builder.pick_free_interior_cell(grid_size, wand_exclude, is_free, has_free_neighbor)
+		if _wand_node:
+			_wand_node.place(_wand_cell)
+			_normalize_item_node(_wand_node, WAND_TEX)
+			_ensure_ranged_pickups_ready()
+			_update_debug_ranged_outlines()
+	else:
+		_wand_cell = Vector2i(-1, -1)
+		if _wand_node:
+			_wand_node.visible = false
+	if _level == _bow_level and not _bow_collected:
+		var bow_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell]
+		_bow_cell = _level_builder.pick_free_interior_cell(grid_size, bow_exclude, is_free, has_free_neighbor)
+		if _bow_node:
+			_bow_node.place(_bow_cell)
+			_normalize_item_node(_bow_node, BOW_TEX)
+			_ensure_ranged_pickups_ready()
+		_update_debug_ranged_outlines()
+	else:
+		_bow_cell = Vector2i(-1, -1)
+		if _bow_node:
+			_bow_node.visible = false
 	# Place potion(s): between 0-2 per level
 	var potion_count := _rng.randi_range(0, 2)
 	if potion_count > 0:
 		_potion_cell = _level_builder.pick_free_interior_cell(
 			grid_size,
-			[player_cell, _key_cell, _sword_cell, _shield_cell],
+			[player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell],
 			is_free,
 			has_free_neighbor
 		)
@@ -793,7 +1041,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if _potion_node:
 			_potion_node.visible = false
 	if potion_count > 1:
-		var exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
+		var exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _wand_cell, _bow_cell]
 		_potion2_cell = _level_builder.pick_free_interior_cell(grid_size, exclude, is_free, has_free_neighbor)
 		if _potion2_node == null and _potion_node != null:
 			_potion2_node = _potion_node.duplicate() as Item
@@ -808,6 +1056,30 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_potion2_collected = true
 		if _potion2_node:
 			_potion2_node.visible = false
+	# Place arrows (planned: max 1 per level, min 1/max 3 per game)
+	_arrow_cells.clear()
+	var arrow_pickups := int(_arrow_plan.get(_level, 0))
+	if arrow_pickups > 0:
+		_ensure_arrow_nodes(arrow_pickups)
+		var arrow_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell]
+		if _potion_cell != Vector2i(-1, -1):
+			arrow_exclude.append(_potion_cell)
+		if _potion2_cell != Vector2i(-1, -1):
+			arrow_exclude.append(_potion2_cell)
+		for i_a in range(arrow_pickups):
+			var acell := _level_builder.pick_free_interior_cell(grid_size, arrow_exclude, is_free, has_free_neighbor)
+			arrow_exclude.append(acell)
+			_arrow_cells.append(acell)
+			var anode := _arrow_nodes[i_a]
+			if anode:
+				anode.place(acell)
+				anode.visible = true
+				anode.collected = false
+	else:
+		for anode in _arrow_nodes:
+			if anode:
+				anode.visible = false
+				anode.collected = true
 	# Place braziers as decor (same count logic as potions)
 	_clear_braziers()
 	var brazier_count := _rng.randi_range(0, 2)
@@ -816,12 +1088,16 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			player_cell,
 			_key_cell,
 			_sword_cell,
-			_shield_cell
+			_shield_cell,
+			_wand_cell,
+			_bow_cell
 		]
 		if _potion_cell != Vector2i(-1, -1):
 			b_exclude.append(_potion_cell)
 		if _potion2_cell != Vector2i(-1, -1):
 			b_exclude.append(_potion2_cell)
+		for ac in _arrow_cells:
+			b_exclude.append(ac)
 		for i_b in range(brazier_count):
 			var b_cell := _level_builder.pick_free_interior_cell(grid_size, b_exclude, is_free, has_free_neighbor)
 			b_exclude.append(b_cell)
@@ -831,11 +1107,13 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_brazier_cells.clear()
 	# Place special (codex/crown/ring) avoiding potions
 	var special_type := _current_level_special_type()
-	var special_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+	var special_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell]
 	if _potion_cell != Vector2i(-1, -1):
 		special_exclude.append(_potion_cell)
 	if _potion2_cell != Vector2i(-1, -1):
 		special_exclude.append(_potion2_cell)
+	for ac2 in _arrow_cells:
+		special_exclude.append(ac2)
 	if special_type == &"codex" or special_type == &"crown":
 		if (special_type == &"codex" and _codex_collected) or (special_type == &"crown" and _crown_collected):
 			_codex_cell = Vector2i(-1, -1)
@@ -865,11 +1143,13 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if _ring_node and special_type != &"ring":
 			_ring_node.visible = false
 	# Place runes according to run-level plan
-	var base_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+	var base_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell]
 	if _potion_cell != Vector2i(-1, -1):
 		base_exclude.append(_potion_cell)
 	if _potion2_cell != Vector2i(-1, -1):
 		base_exclude.append(_potion2_cell)
+	for ac3 in _arrow_cells:
+		base_exclude.append(ac3)
 	if _brazier_cells.size() > 0:
 		base_exclude.append_array(_brazier_cells)
 	if _codex_cell != Vector2i.ZERO:
@@ -914,11 +1194,13 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_rune3_nodes.append(node3)
 	# Torch placement: only once per run
 	if not _torch_collected and _level == _torch_target_level:
-		var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+		var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell]
 		if _potion_cell != Vector2i(-1, -1):
 			exclude2.append(_potion_cell)
 		if _potion2_cell != Vector2i(-1, -1):
 			exclude2.append(_potion2_cell)
+		for ac4 in _arrow_cells:
+			exclude2.append(ac4)
 		for c1 in _rune1_cells:
 			exclude2.append(c1)
 		for c2 in _rune2_cells:
@@ -1048,6 +1330,8 @@ func _restart_game() -> void:
 	_shield_collected = false
 	_potion_collected = false
 	_potion2_collected = false
+	_wand_collected = false
+	_bow_collected = false
 	_armor_current = 0
 	_codex_collected = false
 	_crown_collected = false
@@ -1061,6 +1345,10 @@ func _restart_game() -> void:
 	_rune2_cells.clear()
 	_rune3_cells.clear()
 	_armor_cells.clear()
+	_wand_cell = Vector2i.ZERO
+	_bow_cell = Vector2i.ZERO
+	_arrow_cells.clear()
+	_player_level = 0
 	_key1_icon_persistent = false
 	_key2_icon_persistent = false
 	_key3_icon_persistent = false
@@ -1088,6 +1376,12 @@ func _restart_game() -> void:
 	_armor_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
+	_arrow_count = 0
+	_active_ranged_weapon = RANGED_NONE
+	for anode in _arrow_nodes:
+		if anode:
+			anode.visible = false
+			anode.collected = true
 	_brazier_cells.clear()
 	_clear_braziers()
 	_clear_corpses()
@@ -1154,13 +1448,73 @@ func _fade_to(alpha: float, duration: float) -> void:
 	tw.tween_property(_fade, "modulate:a", alpha, duration)
 	await tw.finished
 
-func _set_icon_visible(icon: TextureRect, should_show: bool) -> void:
+func _set_icon_visible(icon: Control, should_show: bool) -> void:
 	if icon == null:
 		return
-	if should_show and not icon.visible and _hud_items:
-		var last_idx := _hud_items.get_child_count() - 1
-		_hud_items.move_child(icon, max(0, last_idx))
-	icon.visible = should_show
+	icon.visible = true
+	icon.modulate.a = (1.0 if should_show else 0.0)
+
+func _apply_ranged_highlight() -> void:
+	if _hud_bow_panel:
+		_hud_bow_panel.add_theme_stylebox_override(
+			"panel",
+			(_ranged_highlight if _active_ranged_weapon == RANGED_BOW else _ranged_inactive)
+		)
+	if _hud_wand_panel:
+		_hud_wand_panel.add_theme_stylebox_override(
+			"panel",
+			(_ranged_highlight if _active_ranged_weapon == RANGED_WAND else _ranged_inactive)
+		)
+
+func _clear_debug_outline(line) -> void:
+	if line and is_instance_valid(line):
+		line.queue_free()
+
+func _clear_debug_outlines() -> void:
+	_clear_debug_outline(_debug_bow_outline)
+	_clear_debug_outline(_debug_wand_outline)
+	_debug_bow_outline = null
+	_debug_wand_outline = null
+
+func _draw_debug_outline(cell: Vector2i, color: Color) -> Line2D:
+	var line := Line2D.new()
+	line.width = 1
+	line.default_color = color
+	line.z_index = 200
+	line.z_as_relative = false
+	var size := Vector2(float(Grid.CELL_SIZE), float(Grid.CELL_SIZE))
+	line.add_point(Vector2.ZERO)
+	line.add_point(Vector2(size.x, 0))
+	line.add_point(Vector2(size.x, size.y))
+	line.add_point(Vector2(0, size.y))
+	line.add_point(Vector2.ZERO)
+	line.position = Grid.cell_to_world(cell)
+	_decor.add_child(line)
+	return line
+
+func _update_debug_ranged_outlines() -> void:
+	if not DEBUG_FORCE_RANGED:
+		_clear_debug_outline(_debug_bow_outline)
+		_clear_debug_outline(_debug_wand_outline)
+		_debug_bow_outline = null
+		_debug_wand_outline = null
+		return
+	_clear_debug_outline(_debug_bow_outline)
+	_clear_debug_outline(_debug_wand_outline)
+	if not _bow_collected and _bow_cell != Vector2i(-1, -1):
+		_debug_bow_outline = _draw_debug_outline(_bow_cell, Color(0.2, 0.4, 1, 1))
+	if not _wand_collected and _wand_cell != Vector2i(-1, -1):
+		_debug_wand_outline = _draw_debug_outline(_wand_cell, Color(1, 0.9, 0.2, 1))
+
+func _ensure_ranged_pickups_ready() -> void:
+	if _wand_node:
+		_wand_node.collected = false if DEBUG_FORCE_RANGED else _wand_node.collected
+		if _wand_node.visible:
+			_set_sprite_tex(_wand_node, WAND_TEX)
+	if _bow_node:
+		_bow_node.collected = false if DEBUG_FORCE_RANGED else _bow_node.collected
+		if _bow_node.visible:
+			_set_sprite_tex(_bow_node, BOW_TEX)
 
 func _update_fade_rect() -> void:
 	if _fade == null:
@@ -1220,6 +1574,7 @@ func _add_score(amount: int) -> void:
 
 func _maybe_level_up() -> void:
 	while _score >= _next_level_score:
+		_player_level += 1
 		_apply_level_up_reward()
 		_next_level_score += LEVEL_UP_SCORE_STEP
 
@@ -1234,7 +1589,11 @@ func _apply_level_up_reward() -> void:
 	else:
 		if _hp_max < HP_MAX_LIMIT:
 			_hp_max = min(HP_MAX_LIMIT, _hp_max + 1)
-		print("LEVEL UP: +1 MAX HP (max=", _hp_max, ")")
+			print("LEVEL UP: +1 MAX HP (max=", _hp_max, ")")
+		else:
+			_attack_level_bonus += 1
+			_defense_level_bonus += 1
+			print("LEVEL UP: +1 ATK and +1 DEF (max HP already at limit)")
 	if _hp_current < _hp_max:
 		_hp_current = min(_hp_max, _hp_current + 1)
 	_update_hud_hearts()
@@ -1456,6 +1815,34 @@ func _apply_restored_items() -> void:
 			_torch_node.visible = true
 		else:
 			_torch_node.visible = false
+	if _wand_node:
+		if _level == _wand_level and not _wand_collected and _wand_cell != Vector2i(-1, -1):
+			_wand_node.place(_wand_cell)
+			_normalize_item_node(_wand_node, WAND_TEX)
+			_ensure_ranged_pickups_ready()
+			_update_debug_ranged_outlines()
+		else:
+			_wand_node.visible = false
+	if _bow_node:
+		if _level == _bow_level and not _bow_collected and _bow_cell != Vector2i(-1, -1):
+			_bow_node.place(_bow_cell)
+			_normalize_item_node(_bow_node, BOW_TEX)
+			_ensure_ranged_pickups_ready()
+			_update_debug_ranged_outlines()
+		else:
+			_bow_node.visible = false
+	_ensure_arrow_nodes(_arrow_cells.size())
+	for i in range(_arrow_nodes.size()):
+		var anode := _arrow_nodes[i]
+		if anode == null:
+			continue
+		if i < _arrow_cells.size():
+			anode.place(_arrow_cells[i])
+			anode.visible = true
+			anode.collected = false
+		else:
+			anode.visible = false
+			anode.collected = true
 	if _door_node:
 		_door_node.global_position = Grid.cell_to_world(_door_cell)
 	if _entrance_door_node:
@@ -1476,6 +1863,11 @@ func _save_level_state(level: int) -> void:
 	state["potion_collected"] = _potion_collected
 	state["potion2_cell"] = _potion2_cell
 	state["potion2_collected"] = _potion2_collected
+	state["wand_cell"] = _wand_cell
+	state["wand_collected"] = _wand_collected
+	state["bow_cell"] = _bow_cell
+	state["bow_collected"] = _bow_collected
+	state["arrow_cells"] = _arrow_cells.duplicate()
 	state["braziers"] = _brazier_cells.duplicate()
 	state["armor_cells"] = []
 	state["codex_cell"] = _codex_cell
@@ -1593,6 +1985,12 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	_potion_collected = state.get("potion_collected", _potion_collected)
 	_potion2_cell = state.get("potion2_cell", _potion2_cell)
 	_potion2_collected = state.get("potion2_collected", _potion2_collected)
+	_wand_cell = state.get("wand_cell", _wand_cell)
+	_wand_collected = state.get("wand_collected", _wand_collected)
+	_bow_cell = state.get("bow_cell", _bow_cell)
+	_bow_collected = state.get("bow_collected", _bow_collected)
+	_arrow_cells = state.get("arrow_cells", _arrow_cells).duplicate()
+	_ensure_active_ranged_valid()
 	_brazier_cells = state.get("braziers", [])
 	var armor_state: Array = state.get("armor_cells", [])
 	_codex_cell = state.get("codex_cell", _codex_cell)
@@ -1757,6 +2155,8 @@ func _start_game() -> void:
 	_potion2_collected = false
 	_sword_collected = false
 	_shield_collected = false
+	_wand_collected = false
+	_bow_collected = false
 	_torch_collected = false
 	_ring_collected = false
 	_codex_collected = false
@@ -1766,6 +2166,10 @@ func _start_game() -> void:
 	_rune2_collected_count = 0
 	_rune3_collected_count = 0
 	_ring_cell = Vector2i.ZERO
+	_wand_cell = Vector2i.ZERO
+	_bow_cell = Vector2i.ZERO
+	_arrow_cells.clear()
+	_player_level = 0
 	_key1_icon_persistent = false
 	_key2_icon_persistent = false
 	_codex_icon_persistent = false
@@ -1782,12 +2186,18 @@ func _start_game() -> void:
 	_score = 0
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
+	_arrow_count = 0
+	_active_ranged_weapon = RANGED_NONE
 	_brazier_cells.clear()
 	_clear_braziers()
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
+	for anode in _arrow_nodes:
+		if anode:
+			anode.visible = false
+			anode.collected = true
 	# Build board fresh
 	floor_map.clear()
 	walls_map.clear()
@@ -1820,6 +2230,11 @@ func _start_game() -> void:
 func _show_title(visible: bool) -> void:
 	_title_layer.visible = visible
 	_over_layer.visible = false
+	if visible and _title_bg and not _title_textures.is_empty():
+		var pick := _rng.randi_range(0, _title_textures.size() - 1)
+		var tex: Texture2D = _title_textures[pick]
+		if tex:
+			_title_bg.texture = tex
 	_title_label.add_theme_font_size_override("font_size", 64)
 	_title_label.offset_top = get_viewport_rect().size.y * 0.5
 
@@ -1832,7 +2247,7 @@ func _show_game_over(won: bool) -> void:
 	if _over_score:
 		_over_score.add_theme_font_size_override("font_size", 36)
 		_over_score.offset_top = -get_viewport_rect().size.y * 0.12
-		_over_score.text = "Score: %d" % _score
+		_over_score.text = "EXP: %d" % _score
 
 func _on_viewport_resized() -> void:
 	_resize_fullscreen_art()
@@ -1868,6 +2283,17 @@ func _set_world_visible(visible: bool) -> void:
 		_torch_node.visible = visible and not _torch_collected and _level == _torch_target_level
 	if _ring_node:
 		_ring_node.visible = visible and not _ring_collected and _current_level_special_type() == &"ring"
+	if _wand_node:
+		_wand_node.visible = visible and (_level == _wand_level) and not _wand_collected
+		if _wand_node.visible:
+			_normalize_item_node(_wand_node, WAND_TEX)
+	if _bow_node:
+		_bow_node.visible = visible and (_level == _bow_level) and not _bow_collected
+		if _bow_node.visible:
+			_normalize_item_node(_bow_node, BOW_TEX)
+	for anode in _arrow_nodes:
+		if anode:
+			anode.visible = visible and not anode.collected and _arrow_cells.has(anode.grid_cell)
 	for r1 in _rune1_nodes:
 		if r1:
 			r1.visible = visible and not r1.collected
@@ -2127,6 +2553,18 @@ func _reset_items_visibility() -> void:
 	if _torch_node:
 		_torch_node.collected = _torch_collected
 		_torch_node.visible = (_level == _torch_target_level) and not _torch_collected
+	if _wand_node:
+		_wand_node.collected = _wand_collected
+		_wand_node.visible = (_level == _wand_level) and not _wand_collected
+		if _wand_node.visible:
+			_wand_node.collected = false
+			_set_sprite_tex(_wand_node, WAND_TEX)
+	if _bow_node:
+		_bow_node.collected = _bow_collected
+		_bow_node.visible = (_level == _bow_level) and not _bow_collected
+		if _bow_node.visible:
+			_bow_node.collected = false
+			_set_sprite_tex(_bow_node, BOW_TEX)
 	for r1 in _rune1_nodes:
 		if r1:
 			r1.collected = r1.collected
@@ -2146,6 +2584,10 @@ func _reset_items_visibility() -> void:
 	if _ring_node:
 		_ring_node.collected = _ring_collected
 		_ring_node.visible = _current_level_special_type() == &"ring" and not _ring_collected
+	for anode in _arrow_nodes:
+		if anode:
+			anode.collected = anode.collected
+			anode.visible = not anode.collected and _arrow_cells.has(anode.grid_cell)
 
 func _clear_bones() -> void:
 	for bone in _bone_cells.values():
@@ -2439,7 +2881,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_update_hud_hearts()
 	_update_hud_armor()
 	if _hud_level:
-		_hud_level.text = "Level: %d" % _level
+		_hud_level.text = "FLR: %d" % _level
 	_update_fov()
 	_set_world_visible(true)
 	print("[DEBUG] Travel complete -> level ", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " door_cell=", _door_cell, " entrance_cell=", _entrance_cell)
@@ -2471,7 +2913,7 @@ func _update_hud_icons() -> void:
 	var show := (_state == STATE_PLAYING)
 	if _hud_level:
 		_hud_level.visible = show
-		_hud_level.text = "Level: %d" % _level
+		_hud_level.text = "FLR: %d" % _level
 	if _hud_hearts:
 		_hud_hearts.visible = show
 	if _hud_icon_key1 and KEY_TEX_1:
@@ -2506,9 +2948,32 @@ func _update_hud_icons() -> void:
 		_hud_def_label.text = "DEF: %d" % _defense_bonus()
 	if _hud_score:
 		_hud_score.visible = show
-		_hud_score.text = "Score: %d" % _score
+		_hud_score.text = "EXP: %d" % _score
+	if _hud_player_level:
+		_hud_player_level.visible = show
+		_hud_player_level.text = "LVL: %d" % _player_level
 	if _hud_armor:
 		_hud_armor.visible = show
+	if _hud_icon_bow and BOW_TEX:
+		_hud_icon_bow.texture = BOW_TEX
+	var bow_mod := Color(1, 1, 1, 1)
+	if _active_ranged_weapon != RANGED_BOW:
+		bow_mod = Color(0.8, 0.8, 0.8, 1)
+	if _hud_icon_wand and WAND_TEX:
+		_hud_icon_wand.texture = WAND_TEX
+		var wand_mod := Color(1, 1, 1, 1)
+		if _active_ranged_weapon != RANGED_WAND:
+			wand_mod = Color(0.8, 0.8, 0.8, 1)
+		_hud_icon_wand.modulate = wand_mod
+	if _hud_icon_bow:
+		_hud_icon_bow.modulate = bow_mod
+	_set_icon_visible(_hud_icon_bow, show and _bow_collected)
+	_set_icon_visible(_hud_icon_wand, show and _wand_collected)
+	_apply_ranged_highlight()
+	_update_debug_ranged_outlines()
+	if _hud_arrow_label:
+		_hud_arrow_label.visible = show
+		_hud_arrow_label.text = "ARR: %d" % _arrow_count
 
 func _pickup_potion_if_available(cell: Vector2i) -> void:
 	if _carried_potion:
@@ -2530,6 +2995,21 @@ func _pickup_potion_if_available(cell: Vector2i) -> void:
 		_blink_node(player)
 		_update_hud_icons()
 
+func _pickup_arrows_if_available(cell: Vector2i) -> void:
+	var gained := 0
+	for anode in _arrow_nodes:
+		if anode != null and not anode.collected and cell == anode.grid_cell:
+			anode.collect()
+			gained += ARROWS_PER_PICKUP
+			_arrow_cells.erase(cell)
+	if gained > 0:
+		_arrow_count += gained
+		if _active_ranged_weapon == RANGED_NONE and _bow_collected:
+			_active_ranged_weapon = RANGED_BOW
+		_play_sfx(SFX_PICKUP1)
+		_blink_node(player)
+		_update_hud_icons()
+
 func _try_use_potion() -> void:
 	if not _carried_potion:
 		return
@@ -2541,6 +3021,214 @@ func _try_use_potion() -> void:
 	_update_hud_icons()
 	_play_sfx(SFX_PICKUP1)
 	_blink_node(player)
+
+func _ranged_dir_from_input() -> Vector2i:
+	var mapping: Array = [
+		["ranged_dir_up_left", Vector2i(-1, -1)],
+		["ranged_dir_up", Vector2i(0, -1)],
+		["ranged_dir_up_right", Vector2i(1, -1)],
+		["ranged_dir_left", Vector2i(-1, 0)],
+		["ranged_dir_right", Vector2i(1, 0)],
+		["ranged_dir_down_left", Vector2i(-1, 1)],
+		["ranged_dir_down", Vector2i(0, 1)],
+		["ranged_dir_down_right", Vector2i(1, 1)],
+	]
+	for pair in mapping:
+		var action: String = pair[0]
+		var dir: Vector2i = pair[1]
+		if Input.is_action_just_pressed(action):
+			return dir
+	return Vector2i.ZERO
+
+func _ensure_active_ranged_valid() -> void:
+	if _active_ranged_weapon == RANGED_WAND and not _wand_collected:
+		_active_ranged_weapon = RANGED_BOW if _bow_collected else RANGED_NONE
+	elif _active_ranged_weapon == RANGED_BOW and not _bow_collected:
+		_active_ranged_weapon = RANGED_WAND if _wand_collected else RANGED_NONE
+	if _active_ranged_weapon == RANGED_NONE:
+		if _wand_collected:
+			_active_ranged_weapon = RANGED_WAND
+		elif _bow_collected:
+			_active_ranged_weapon = RANGED_BOW
+
+func _cycle_ranged_weapon() -> void:
+	var available: Array[StringName] = []
+	if _wand_collected:
+		available.append(RANGED_WAND)
+	if _bow_collected:
+		available.append(RANGED_BOW)
+	if available.is_empty():
+		return
+	_ensure_active_ranged_valid()
+	var idx := available.find(_active_ranged_weapon)
+	if idx == -1:
+		_active_ranged_weapon = available[0]
+	else:
+		_active_ranged_weapon = available[(idx + 1) % available.size()]
+	_update_hud_icons()
+
+func _fire_ranged(dir: Vector2i) -> bool:
+	if dir == Vector2i.ZERO or _state != STATE_PLAYING or _is_transitioning:
+		return false
+	_ensure_active_ranged_valid()
+	if _active_ranged_weapon == RANGED_WAND and _wand_collected:
+		_cast_wand(dir)
+		return true
+	if _active_ranged_weapon == RANGED_BOW and _bow_collected:
+		return _shoot_bow(dir)
+	return false
+
+func _cone_cells(dir: Vector2i, distance: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var dx: int = sign(dir.x)
+	var dy: int = sign(dir.y)
+	for dist in range(1, distance + 1):
+		if dx != 0 and dy == 0:
+			for spread in range(-dist, dist + 1):
+				cells.append(Vector2i(dx * dist, spread))
+		elif dy != 0 and dx == 0:
+			for spread2 in range(-dist, dist + 1):
+				cells.append(Vector2i(spread2, dy * dist))
+		else:
+			for sx in range(0, dist + 1):
+				for sy in range(0, dist + 1):
+					if sx == 0 and sy == 0:
+						continue
+					if max(sx, sy) != dist:
+						continue
+					cells.append(Vector2i(dx * sx, dy * sy))
+	return cells
+
+func _cast_wand(dir: Vector2i) -> void:
+	var origin := Grid.world_to_cell(player.global_position)
+	var hit := false
+	_play_sfx(SFX_WAND)
+	_flash_cone(dir, origin, 3, Color(0.6, 0.3, 0.8, 0.55))
+	for offset in _cone_cells(dir, 3):
+		var target := origin + offset
+		if not _in_interior(target):
+			continue
+		if _is_wall(target):
+			continue
+		var enemy := _get_enemy_at(target)
+		if enemy != null:
+			hit = true
+			_blink_node(enemy)
+			enemy.apply_damage(1)
+			if not enemy.alive:
+				_handle_enemy_death(enemy)
+				_check_win()
+	if _wand_node:
+		_wand_node.collect()
+	_wand_collected = false
+	_wand_cell = Vector2i(-1, -1)
+	if _active_ranged_weapon == RANGED_WAND:
+		_active_ranged_weapon = RANGED_BOW if _bow_collected else RANGED_NONE
+	if hit:
+		_play_sfx(SFX_HURT1)
+		_play_sfx(SFX_PICKUP2)
+	_update_hud_icons()
+	_advance_enemies_and_update(_skeletons.size())
+
+func _shoot_bow(dir: Vector2i) -> bool:
+	if not _bow_collected or _arrow_count <= 0:
+		return false
+	_arrow_count = max(0, _arrow_count - 1)
+	_play_sfx(SFX_BOW)
+	var origin := Grid.world_to_cell(player.global_position)
+	var path_end := origin
+	for i in range(1, 8):
+		var target := origin + dir * i
+		if not _in_interior(target):
+			path_end = origin + dir * (i - 1)
+			break
+		if _is_wall(target):
+			path_end = origin + dir * (i - 1)
+			break
+		var enemy := _get_enemy_at(target)
+		if enemy != null:
+			path_end = target
+			if _bow_missed(origin, target):
+				break
+			_play_sfx(SFX_HURT1)
+			_blink_node(enemy)
+			enemy.apply_damage(1)
+			if not enemy.alive:
+				_handle_enemy_death(enemy)
+				_check_win()
+			break
+		var trap := _trap_at(target)
+		if trap != null:
+			path_end = target
+			break
+		path_end = target
+	_fire_projectile(origin, path_end, Color(1, 1, 1, 1))
+	_update_hud_icons()
+	_advance_enemies_and_update(_skeletons.size())
+	return true
+
+func _bow_missed(origin: Vector2i, target: Vector2i) -> bool:
+	var dist: int = max(abs(origin.x - target.x), abs(origin.y - target.y))
+	if dist <= 1:
+		return false
+	var miss_chance: float = clampf((dist - 1) * 0.05, 0.0, 0.25)
+	return _rng.randf() < miss_chance
+
+func _fire_projectile(origin: Vector2i, end_cell: Vector2i, color: Color) -> void:
+	var line: Line2D = null
+	if not _projectile_pool.is_empty():
+		line = _projectile_pool.pop_back()
+	if line == null:
+		line = Line2D.new()
+		line.width = 1
+		line.default_color = color
+		line.begin_cap_mode = Line2D.LINE_CAP_BOX
+		line.end_cap_mode = Line2D.LINE_CAP_BOX
+		line.add_point(Vector2.ZERO)
+		line.add_point(Vector2(6, 0))
+		line.z_index = 60
+		line.z_as_relative = false
+		_decor.add_child(line)
+	line.default_color = color
+	line.visible = true
+	var start_pos: Vector2 = Grid.cell_to_world(origin) + Vector2(Grid.CELL_SIZE / 2, Grid.CELL_SIZE / 2)
+	var end_pos: Vector2 = Grid.cell_to_world(end_cell) + Vector2(Grid.CELL_SIZE / 2, Grid.CELL_SIZE / 2)
+	var dir_vec: Vector2 = end_pos - start_pos
+	line.rotation = atan2(dir_vec.y, dir_vec.x)
+	line.position = start_pos
+	_projectile_active.append(line)
+	var dist: float = max(1.0, start_pos.distance_to(end_pos))
+	var duration: float = clampf(dist / (Grid.CELL_SIZE * 18.0), 0.05, 0.18)
+	var tw := get_tree().create_tween()
+	tw.tween_property(line, "position", end_pos, duration)
+	tw.tween_property(line, "modulate:a", 0.0, 0.1)
+	tw.finished.connect(func():
+		line.visible = false
+		line.modulate.a = 1.0
+		_projectile_active.erase(line)
+		_projectile_pool.append(line)
+	)
+
+func _flash_cone(dir: Vector2i, origin: Vector2i, distance: int, color: Color) -> void:
+	var cells := _cone_cells(dir, distance)
+	for offset in cells:
+		var target := origin + offset
+		if not _in_interior(target):
+			continue
+		var pos := Grid.cell_to_world(target)
+		var rect := ColorRect.new()
+		rect.color = color
+		rect.modulate.a = 0.5
+		rect.size = Vector2(float(Grid.CELL_SIZE), float(Grid.CELL_SIZE))
+		rect.position = pos
+		rect.z_index = 55
+		rect.z_as_relative = false
+		_decor.add_child(rect)
+		var tw := get_tree().create_tween()
+		tw.tween_property(rect, "modulate:a", 0.0, 0.12)
+		tw.finished.connect(func():
+			rect.queue_free()
+		)
 
 func _apply_trap_damage() -> void:
 	if _game_over:
@@ -2644,6 +3332,16 @@ func _set_level_item_textures() -> void:
 		(_potion_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	if _potion2_node and _potion2_node.get_node_or_null("Sprite2D") is Sprite2D:
 		(_potion2_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _wand_node and _wand_node.get_node_or_null("Sprite2D") is Sprite2D:
+		var w_s := _wand_node.get_node("Sprite2D") as Sprite2D
+		w_s.texture = WAND_TEX if WAND_TEX != null else w_s.texture
+		w_s.z_index = 1
+	if _bow_node and _bow_node.get_node_or_null("Sprite2D") is Sprite2D:
+		var b_s := _bow_node.get_node("Sprite2D") as Sprite2D
+		b_s.texture = BOW_TEX if BOW_TEX != null else b_s.texture
+		b_s.z_index = 1
+	if _arrow_base_node and _arrow_base_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_arrow_base_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	# HUD icons match the same textures
 	if _hud_icon_key1 and KEY_TEX_1:
 		_hud_icon_key1.texture = KEY_TEX_1
@@ -2673,6 +3371,10 @@ func _set_level_item_textures() -> void:
 		_hud_icon_ring.texture = RING_TEX
 	if _hud_icon_potion and POTION_TEX:
 		_hud_icon_potion.texture = POTION_TEX
+	if _hud_icon_bow and BOW_TEX:
+		_hud_icon_bow.texture = BOW_TEX
+	if _hud_icon_wand and WAND_TEX:
+		_hud_icon_wand.texture = WAND_TEX
 
 func is_passable(cell: Vector2i) -> bool:
 	# Allow stepping onto the door cell only when it is actually open
@@ -2689,7 +3391,7 @@ func _place_random_inner_walls(grid_size: Vector2i) -> void:
 		if _get_enemy_at(c) != null:
 			return true
 		return false
-	_level_builder.place_random_inner_walls(grid_size, walls_map, SOURCES_WALL, TILE_WALL, is_blocked)
+	_level_builder.place_random_inner_walls(grid_size, walls_map, _current_wall_sources, TILE_WALL, is_blocked)
 
 func _is_wall(cell: Vector2i) -> bool:
 	return walls_map.get_cell_source_id(0, cell) != -1
@@ -2743,6 +3445,18 @@ func _make_item_node(item_name: String, tex: Texture2D) -> Item:
 	item.add_child(s)
 	return item
 
+func _ensure_arrow_nodes(count: int) -> void:
+	if _arrow_nodes.is_empty() and _arrow_base_node:
+		_arrow_nodes.append(_arrow_base_node)
+	while _arrow_nodes.size() < count:
+		var idx := _arrow_nodes.size()
+		var node := _make_item_node("ArrowPickup%d" % idx, ARROW_TEX)
+		add_child(node)
+		_arrow_nodes.append(node)
+	for i in range(_arrow_nodes.size()):
+		if i >= count and _arrow_nodes[i] != null:
+			_arrow_nodes[i].visible = false
+
 
 func _pick_free_cell_next_to_wall(grid_size: Vector2i) -> Vector2i:
 	# Prefer cells that are free and adjacent to a wall, but pick randomly from all candidates
@@ -2772,6 +3486,15 @@ func _setup_input() -> void:
 		["restart", [Key.KEY_SPACE, Key.KEY_ENTER]],
 		["start", [Key.KEY_ENTER]],
 		["use_potion", [Key.KEY_Q]],
+		["switch_ranged", [Key.KEY_R]],
+		["ranged_dir_up", [Key.KEY_KP_8]],
+		["ranged_dir_down", [Key.KEY_KP_2]],
+		["ranged_dir_left", [Key.KEY_KP_4]],
+		["ranged_dir_right", [Key.KEY_KP_6]],
+		["ranged_dir_up_left", [Key.KEY_KP_7]],
+		["ranged_dir_up_right", [Key.KEY_KP_9]],
+		["ranged_dir_down_left", [Key.KEY_KP_1]],
+		["ranged_dir_down_right", [Key.KEY_KP_3]],
 	]
 	for pair in mapping:
 		var name: String = pair[0]
@@ -2792,6 +3515,8 @@ func _prepare_run_layout() -> void:
 	_rune1_plan.clear()
 	_rune2_plan.clear()
 	_rune3_plan.clear()
+	_arrow_plan.clear()
+	_tileset_plan.clear()
 	var levels: Array[int] = []
 	for i in range(1, _max_level + 1):
 		levels.append(i)
@@ -2816,7 +3541,7 @@ func _prepare_run_layout() -> void:
 	var armor_total: int = _rng.randi_range(1, 3)
 	var rune1_total: int = _rng.randi_range(1, 3)
 	var rune2_total: int = _rng.randi_range(1, 3)
-	var rune3_total: int = _rng.randi_range(1, 3)
+	var rune3_total: int = 1
 	for i_a in range(armor_total):
 		var al: int = _rng.randi_range(1, _max_level)
 		_armor_plan[al] = _armor_plan.get(al, 0) + 1
@@ -2829,6 +3554,22 @@ func _prepare_run_layout() -> void:
 	for i5 in range(rune3_total):
 		var rl3: int = _rng.randi_range(1, _max_level)
 		_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
+	var arrow_levels: Array[int] = []
+	for i6 in range(1, _max_level + 1):
+		arrow_levels.append(i6)
+	arrow_levels.shuffle()
+	var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
+	for _i_arrow in range(arrow_total):
+		if arrow_levels.is_empty():
+			break
+		var al: int = arrow_levels.pop_back()
+		_arrow_plan[al] = 1
+	_wand_level = _rng.randi_range(1, _max_level)
+	_bow_level = _rng.randi_range(1, _max_level)
+	if DEBUG_FORCE_RANGED:
+		_wand_level = 1
+		_bow_level = 1
+		_arrow_plan[1] = 1
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
 	for g: Goblin in _goblins:

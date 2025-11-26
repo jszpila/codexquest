@@ -5,11 +5,11 @@
   - [x] Additional keys, special items  
   - [x] Each level probably doesn't need both; "open" levels would be ok
   - [ ] Randomize size
-  - [x] How to scale, populate enemies?
 - [ ] Pick-up animation/splash  
-- [ ] Integrate additional wall/floor tiles sets.
-  - [ ] Mix sets, or select one per level?
-- [ ] Ranged weapon (wand? arrows?)  
+- [x] Integrate additional wall/floor tiles sets.
+- [x] Ranged weapon
+  - [x] Want  
+  - [x] Bow
 - [ ] Ranged enemy
 - [x] Armor pick-up w/ meter
 - [x] Basic XP/leveling system based on score
@@ -21,3 +21,7 @@
   - [ ] title
   - [ ] game over
   - [ ] game won
+
+## FIXME
+
+- [x] HUD moving around w/ lots of items
