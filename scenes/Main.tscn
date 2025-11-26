@@ -130,217 +130,275 @@ color = Color(0, 0, 0, 0.5)
 [node name="HUDBar" type="HBoxContainer" parent="HUD"]
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 12.0
-offset_right = -12.0
+offset_left = 8.0
+offset_right = -8.0
 offset_bottom = 64.0
 grow_horizontal = 2
-theme_override_constants/separation = 10
+size_flags_vertical = 4
+theme_override_constants/separation = 8
 
 [node name="HUDVitals" type="VBoxContainer" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(240, 64)
+custom_minimum_size = Vector2(220, 64)
 layout_mode = 2
+size_flags_horizontal = 0
 size_flags_vertical = 4
+alignment = 1
 theme_override_constants/separation = 0
 
 [node name="HeartsBorder" type="PanelContainer" parent="HUD/HUDBar/HUDVitals"]
-custom_minimum_size = Vector2(240, 24)
+custom_minimum_size = Vector2(220, 28)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("2")
 
 [node name="Hearts" type="HBoxContainer" parent="HUD/HUDBar/HUDVitals/HeartsBorder"]
-custom_minimum_size = Vector2(240, 24)
+custom_minimum_size = Vector2(220, 28)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 6
 
 [node name="ArmorBorder" type="PanelContainer" parent="HUD/HUDBar/HUDVitals"]
-custom_minimum_size = Vector2(240, 24)
+custom_minimum_size = Vector2(220, 28)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("3")
 
 [node name="Armor" type="HBoxContainer" parent="HUD/HUDBar/HUDVitals/ArmorBorder"]
-custom_minimum_size = Vector2(240, 24)
+custom_minimum_size = Vector2(220, 28)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 6
 
-[node name="HUDLevel" type="Label" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(128, 48)
+[node name="HUDTextGroup" type="PanelContainer" parent="HUD/HUDBar"]
+custom_minimum_size = Vector2(220, 64)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("4")
+
+[node name="HUDTextGrid" type="GridContainer" parent="HUD/HUDBar/HUDTextGroup"]
+layout_mode = 2
+columns = 3
+h_separation = 4
+v_separation = 0
+size_flags_vertical = 4
+
+[node name="HUDLevel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
+custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("5")
-text = "Level: 1"
+text = "FLR: 1"
 horizontal_alignment = 0
 vertical_alignment = 1
-
-[node name="HUDStats" type="HBoxContainer" parent="HUD/HUDBar"]
-layout_mode = 2
 size_flags_vertical = 4
-theme_override_constants/separation = 4
 
-[node name="HUDATKLabel" type="Label" parent="HUD/HUDBar/HUDStats"]
-custom_minimum_size = Vector2(128, 48)
+[node name="HUDATKLabel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
+custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("6")
 text = "ATK: 0"
 horizontal_alignment = 0
 vertical_alignment = 1
+size_flags_vertical = 4
 
-[node name="HUDDEFLabel" type="Label" parent="HUD/HUDBar/HUDStats"]
-custom_minimum_size = Vector2(128, 48)
+[node name="HUDDEFLabel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
+custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("7")
 text = "DEF: 0"
 horizontal_alignment = 0
 vertical_alignment = 1
+size_flags_vertical = 4
 
-[node name="HUDScore" type="Label" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(128, 48)
+[node name="HUDArrows" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
+custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("8")
-text = "Score: 0"
+text = "ARR: 0"
 horizontal_alignment = 0
 vertical_alignment = 1
-
-[node name="TextSpacer" type="Control" parent="HUD/HUDBar"]
-layout_mode = 2
-custom_minimum_size = Vector2(8, 1)
-size_flags_horizontal = 0
 size_flags_vertical = 4
 
-[node name="SpacerItems" type="Control" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(12, 1)
+[node name="HUDPlayerLevel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
+custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
+theme_override_fonts/font = ExtResource("5")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 28
+theme_override_styles/normal = SubResource("8")
+text = "LVL: 0"
+horizontal_alignment = 0
+vertical_alignment = 1
+size_flags_vertical = 4
+
+[node name="HUDScore" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
+custom_minimum_size = Vector2(72, 30)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 28
+theme_override_styles/normal = SubResource("8")
+text = "EXP: 0"
+horizontal_alignment = 0
+vertical_alignment = 1
 size_flags_vertical = 4
 
 [node name="HUDItems" type="PanelContainer" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(320, 48)
+custom_minimum_size = Vector2(320, 64)
 layout_mode = 2
+size_flags_horizontal = 0
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("4")
 
-[node name="HUDItemsContainer" type="HBoxContainer" parent="HUD/HUDBar/HUDItems"]
-custom_minimum_size = Vector2(320, 48)
+[node name="HUDItemsContainer" type="GridContainer" parent="HUD/HUDBar/HUDItems"]
+custom_minimum_size = Vector2(320, 64)
 layout_mode = 2
+columns = 8
+h_separation = 4
+v_separation = 4
 size_flags_vertical = 4
-theme_override_constants/separation = 6
 
 [node name="HUDKey1Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDKey2Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDKey3Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDSwordIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDShieldIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDCodexIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDCrownIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDRune1Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDRune2Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDRune3Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDTorchIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDRingIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
 
 [node name="HUDPotionIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
-visible = false
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
+mouse_filter = 2
+
+[node name="HUDBowSlot" type="PanelContainer" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="HUDBowIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
+
+[node name="HUDWandSlot" type="PanelContainer" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="HUDWandIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
 [node name="Fade" type="ColorRect" parent="HUD"]
 z_index = 100
 anchors_preset = 15
@@ -459,4 +517,22 @@ centered = false
 script = ExtResource("17")
 
 [node name="Sprite2D" type="Sprite2D" parent="Codex"]
+centered = false
+
+[node name="Bow" type="Node2D" parent="."]
+script = ExtResource("17")
+
+[node name="Sprite2D" type="Sprite2D" parent="Bow"]
+centered = false
+
+[node name="Wand" type="Node2D" parent="."]
+script = ExtResource("17")
+
+[node name="Sprite2D" type="Sprite2D" parent="Wand"]
+centered = false
+
+[node name="ArrowPickup" type="Node2D" parent="."]
+script = ExtResource("17")
+
+[node name="Sprite2D" type="Sprite2D" parent="ArrowPickup"]
 centered = false

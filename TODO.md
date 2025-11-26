@@ -7,7 +7,9 @@
   - [ ] Randomize size
 - [ ] Pick-up animation/splash  
 - [x] Integrate additional wall/floor tiles sets.
-- [ ] Ranged weapon (wand? arrows?)  
+- [x] Ranged weapon
+  - [x] Want  
+  - [x] Bow
 - [ ] Ranged enemy
 - [x] Armor pick-up w/ meter
 - [x] Basic XP/leveling system based on score
@@ -22,4 +24,4 @@
 
 ## FIXME
 
-- [ ] HUD moving around w/ lots of items
+- [x] HUD moving around w/ lots of items

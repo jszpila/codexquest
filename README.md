@@ -6,6 +6,7 @@ An adventure in vibe coding with Codex and Godot. See it in action at [jszpila.g
 
 ## Asset Credits
 
+- SFX generated with [sfxr.me](https://sfxr.me/)
 - [Frames 1-bit](https://piiixl.itch.io/frames-1-bit)
 - [Urizen 1Bit Tileset](https://piiixl.itch.io/frames-1-bit)
 - [DungeonFont](https://vrtxrry.itch.io/dungeonfont)
