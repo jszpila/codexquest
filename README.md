@@ -1,7 +1,12 @@
-# CODEX QUEST  
+# Chasm Of Belligerence  
 
-An adventure in vibe coding with Codex and Godot. See it in action at [stuff.szpi.la/codexquest](https://stuff.szpi.la/codexquest)
+![Chasm of Belligerence](assets/CoB-title.png "Chasm of Belligerence")  
+
+An adventure in vibe coding with Codex and Godot. See it in action at [jszpila.github.io/codexquest](https://jszpila.github.io/codexquest/)
 
 ## Asset Credits
-[Frames 1-bit](https://piiixl.itch.io/frames-1-bit)
-[Urizen 1Bit Tileset](https://piiixl.itch.io/frames-1-bit)
+
+- [Frames 1-bit](https://piiixl.itch.io/frames-1-bit)
+- [Urizen 1Bit Tileset](https://piiixl.itch.io/frames-1-bit)
+- [DungeonFont](https://vrtxrry.itch.io/dungeonfont)
+- [m5x7 font](https://managore.itch.io/m5x7)

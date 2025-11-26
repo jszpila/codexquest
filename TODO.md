@@ -11,9 +11,9 @@
   - [ ] Mix sets, or select one per level?
 - [ ] Ranged weapon (wand? arrows?)  
 - [ ] Ranged enemy
-- [ ] Armor pick-up w/ meter
-- [ ] Basic XP/leveling system based on score
-- [ ] Rune 3: increase max health
+- [x] Armor pick-up w/ meter
+- [x] Basic XP/leveling system based on score
+- [x] Rune 3: increase max health
 - [x] Health Potion: can pick up and use 1 if picked up at max HP  
 - [x] Find and implement better font
 - [ ] Dash attack

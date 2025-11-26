@@ -18,8 +18,6 @@ html, body { margin: 0; background: #000; color: #ddd; font-family: system-ui, s
 body {
 	color: white;
 	background-color: black;
-	overflow: hidden;
-	touch-action: none;
 }
 
 #canvas {
@@ -105,7 +103,7 @@ body {
 }
 
 .text-content h2 {
-	margin: 0 0 0.25rem 0;
+	margin: .5rem 0 0.25rem 0;
 }
 
 .text-content ul {
@@ -118,12 +116,11 @@ body {
 }
 
 .flex-container {
-	display: flex;
-	justify-content: center;
+	max-width: 960px;
+	margin: 0 auto;
 }
 
 .flex-item{
-	flex: 1;
 	padding-right: 1rem
 }
 		</style>
