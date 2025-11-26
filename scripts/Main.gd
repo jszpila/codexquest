@@ -23,8 +23,9 @@ const GRID_H := 25 # unused; kept for reference
 
 const TILE_FLOOR: Vector2i = Vector2i(0, 0)
 const TILE_WALL: Vector2i = Vector2i(0, 0)
-const SOURCES_FLOOR: Array[int] = [0, 1, 2, 3]
-const SOURCES_WALL: Array[int] = [4, 5, 6, 7, 8]
+const TILESET_A := &"tile_set_a"
+const TILESET_B := &"tile_set_b"
+const TILESET_C := &"tile_set_c"
 const FIXED_GRID_W := 48
 const FIXED_GRID_H := 36
 
@@ -47,6 +48,7 @@ const BONE_ALPHA_MAX := 1.0
 const ARMOR_MAX := 3
 const LEVEL_UP_SCORE_STEP := 10
 const HP_MAX_LIMIT := 10
+const SHARED_FLOOR_WEIGHT := 0.15
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -84,8 +86,21 @@ var TRAP_WEB_TEX: Texture2D
 var BRAZIER_TEX: Texture2D
 var BONE_TEXTURES: Array[Texture2D] = []
 var SPIDERWEB_TEXTURES := {}
-var FLOOR_TEXTURES: Array[Texture2D] = []
-var WALL_TEXTURES: Array[Texture2D] = []
+var FLOOR_TEXTURES_A: Array[Texture2D] = []
+var FLOOR_TEXTURES_B: Array[Texture2D] = []
+var FLOOR_TEXTURES_C: Array[Texture2D] = []
+var FLOOR_TEXTURES_SHARED: Array[Texture2D] = []
+var WALL_TEXTURES_A: Array[Texture2D] = []
+var WALL_TEXTURES_B: Array[Texture2D] = []
+var WALL_TEXTURES_C: Array[Texture2D] = []
+var _floor_sources_by_set := {}
+var _wall_sources_by_set := {}
+var _shared_floor_sources: Array[int] = []
+var _current_floor_sources_base: Array[int] = []
+var _current_floor_sources: Array[int] = []
+var _current_wall_sources: Array[int] = []
+var _tileset_plan := {}
+var _tileset_choices: Array[StringName] = [TILESET_A, TILESET_B, TILESET_C]
 var _sheet_image: Image
 var _sheet_tex_cache := {}
 
@@ -228,18 +243,47 @@ func _load_spritesheet_textures() -> void:
 		&"bottom_left": _sheet_tex(&"spiderweb_bottom_left", Vector2i(26, 507), true),
 		&"bottom_right": _sheet_tex(&"spiderweb_bottom_right", Vector2i(39, 507), true),
 	}
-	FLOOR_TEXTURES = [
-		_sheet_tex(&"floor1", Vector2i(130, 65), false),
-		_sheet_tex(&"floor2", Vector2i(143, 65), false),
-		_sheet_tex(&"floor3", Vector2i(156, 65), false),
-		_sheet_tex(&"floor4", Vector2i(117, 65), false),
+	FLOOR_TEXTURES_A = [
+		_sheet_tex(&"tile_set_a_floor_1", Vector2i(130, 65), false),
+		_sheet_tex(&"tile_set_a_floor_2", Vector2i(143, 65), false),
+		_sheet_tex(&"tile_set_a_floor_3", Vector2i(156, 65), false),
+		_sheet_tex(&"tile_set_a_floor_4", Vector2i(117, 65), false),
 	]
-	WALL_TEXTURES = [
-		_sheet_tex(&"wall1", Vector2i(0, 26), false),
-		_sheet_tex(&"wall2", Vector2i(13, 26), false),
-		_sheet_tex(&"wall3", Vector2i(65, 26), false),
-		_sheet_tex(&"wall4", Vector2i(78, 26), false),
-		_sheet_tex(&"wall5", Vector2i(91, 26), false),
+	WALL_TEXTURES_A = [
+		_sheet_tex(&"tile_set_a_wall_1", Vector2i(0, 26), false),
+		_sheet_tex(&"tile_set_a_wall_2", Vector2i(13, 26), false),
+		_sheet_tex(&"tile_set_a_wall_3", Vector2i(65, 26), false),
+		_sheet_tex(&"tile_set_a_wall_4", Vector2i(78, 26), false),
+		_sheet_tex(&"tile_set_a_wall_5", Vector2i(91, 26), false),
+	]
+	FLOOR_TEXTURES_B = [
+		_sheet_tex(&"tile_set_b_floor_1", Vector2i(52, 65), false),
+		_sheet_tex(&"tile_set_b_floor_2", Vector2i(65, 65), false),
+		_sheet_tex(&"tile_set_b_floor_3", Vector2i(78, 65), false),
+		_sheet_tex(&"tile_set_b_floor_4", Vector2i(91, 65), false),
+	]
+	WALL_TEXTURES_B = [
+		_sheet_tex(&"tile_set_b_wall_1", Vector2i(39, 0), false),
+		_sheet_tex(&"tile_set_b_wall_2", Vector2i(52, 0), false),
+		_sheet_tex(&"tile_set_b_wall_3", Vector2i(65, 0), false),
+		_sheet_tex(&"tile_set_b_wall_4", Vector2i(78, 0), false),
+	]
+	FLOOR_TEXTURES_C = [
+		_sheet_tex(&"tile_set_c_floor_1", Vector2i(78, 78), false),
+		_sheet_tex(&"tile_set_c_floor_2", Vector2i(91, 78), false),
+		_sheet_tex(&"tile_set_c_floor_3", Vector2i(130, 78), false),
+		_sheet_tex(&"tile_set_c_floor_4", Vector2i(143, 78), false),
+	]
+	WALL_TEXTURES_C = [
+		_sheet_tex(&"tile_set_c_wall_1", Vector2i(0, 39), false),
+		_sheet_tex(&"tile_set_c_wall_2", Vector2i(13, 39), false),
+		_sheet_tex(&"tile_set_c_wall_3", Vector2i(26, 39), false),
+		_sheet_tex(&"tile_set_c_wall_4", Vector2i(156, 39), false),
+	]
+	FLOOR_TEXTURES_SHARED = [
+		_sheet_tex(&"old_bones_floor_1", Vector2i(0, 91), false),
+		_sheet_tex(&"old_bones_floor_2", Vector2i(13, 91), false),
+		_sheet_tex(&"old_bones_floor_3", Vector2i(26, 91), false),
 	]
 	_sheet_tex_cache[&"mouse_tex"] = mouse_tex
 	_set_sprite_tex(_door_node, DOOR_TEX_1)
@@ -253,12 +297,47 @@ func _load_spritesheet_textures() -> void:
 func _build_tileset_from_sheet() -> void:
 	_tileset = TileSet.new()
 	_tileset.tile_size = Vector2i(12, 12)
-	for i in range(FLOOR_TEXTURES.size()):
-		var src := _make_tile_source(FLOOR_TEXTURES[i])
-		_tileset.add_source(src, i)
-	for i in range(WALL_TEXTURES.size()):
-		var src2 := _make_tile_source(WALL_TEXTURES[i])
-		_tileset.add_source(src2, SOURCES_WALL[0] + i)
+	_floor_sources_by_set.clear()
+	_wall_sources_by_set.clear()
+	_shared_floor_sources.clear()
+	var tilesets: Array = [
+		{
+			"id": TILESET_A,
+			"floors": FLOOR_TEXTURES_A,
+			"walls": WALL_TEXTURES_A
+		},
+		{
+			"id": TILESET_B,
+			"floors": FLOOR_TEXTURES_B,
+			"walls": WALL_TEXTURES_B
+		},
+		{
+			"id": TILESET_C,
+			"floors": FLOOR_TEXTURES_C,
+			"walls": WALL_TEXTURES_C
+		},
+	]
+	var next_source_id := 0
+	for ts in tilesets:
+		var floor_sources: Array[int] = []
+		for tex: Texture2D in ts["floors"]:
+			var src := _make_tile_source(tex)
+			_tileset.add_source(src, next_source_id)
+			floor_sources.append(next_source_id)
+			next_source_id += 1
+		_floor_sources_by_set[ts["id"]] = floor_sources
+		var wall_sources: Array[int] = []
+		for tex2: Texture2D in ts["walls"]:
+			var src2 := _make_tile_source(tex2)
+			_tileset.add_source(src2, next_source_id)
+			wall_sources.append(next_source_id)
+			next_source_id += 1
+		_wall_sources_by_set[ts["id"]] = wall_sources
+	for shared_tex in FLOOR_TEXTURES_SHARED:
+		var shared_src := _make_tile_source(shared_tex)
+		_tileset.add_source(shared_src, next_source_id)
+		_shared_floor_sources.append(next_source_id)
+		next_source_id += 1
 	floor_map.tile_set = _tileset
 	walls_map.tile_set = _tileset
 
@@ -695,13 +774,46 @@ func _get_grid_size() -> Vector2i:
 	# Use a fixed world size (in tiles)
 	return Vector2i(FIXED_GRID_W, FIXED_GRID_H)
 
+func _set_current_tileset_for_level(level: int) -> void:
+	if _tileset_choices.is_empty():
+		_tileset_choices = [TILESET_A]
+	if not _tileset_plan.has(level):
+		var choice: StringName = _tileset_choices[_rng.randi_range(0, _tileset_choices.size() - 1)]
+		_tileset_plan[level] = choice
+	var ts_choice: StringName = _tileset_plan[level]
+	var base_floor_sources: Array = _floor_sources_by_set.get(ts_choice, [])
+	if base_floor_sources.is_empty() and _floor_sources_by_set.has(TILESET_A):
+		base_floor_sources = _floor_sources_by_set[TILESET_A]
+	_current_floor_sources_base = base_floor_sources.duplicate()
+	_current_floor_sources = _build_weighted_floor_sources(_current_floor_sources_base, _shared_floor_sources, SHARED_FLOOR_WEIGHT)
+	var base_wall_sources: Array = _wall_sources_by_set.get(ts_choice, [])
+	if base_wall_sources.is_empty() and _wall_sources_by_set.has(TILESET_A):
+		base_wall_sources = _wall_sources_by_set[TILESET_A]
+	_current_wall_sources = base_wall_sources.duplicate()
+
+func _build_weighted_floor_sources(base_sources: Array, shared_sources: Array, shared_ratio: float) -> Array[int]:
+	if shared_sources.is_empty():
+		return base_sources.duplicate()
+	if base_sources.is_empty():
+		return shared_sources.duplicate()
+	var total_buckets := 100
+	var shared_bucket_count := clampi(int(round(float(total_buckets) * shared_ratio)), 1, total_buckets - 1)
+	var base_bucket_count := total_buckets - shared_bucket_count
+	var weighted: Array[int] = []
+	for i in range(base_bucket_count):
+		weighted.append(base_sources[i % base_sources.size()])
+	for j in range(shared_bucket_count):
+		weighted.append(shared_sources[j % shared_sources.size()])
+	return weighted
+
 func _build_maps(grid_size: Vector2i) -> void:
+	_set_current_tileset_for_level(_level)
 	_level_builder.build_test_map(
 		floor_map,
 		walls_map,
 		grid_size,
-		SOURCES_FLOOR,
-		SOURCES_WALL,
+		_current_floor_sources,
+		_current_wall_sources,
 		TILE_FLOOR,
 		TILE_WALL,
 		FLOOR_ALPHA_MIN,
@@ -2689,7 +2801,7 @@ func _place_random_inner_walls(grid_size: Vector2i) -> void:
 		if _get_enemy_at(c) != null:
 			return true
 		return false
-	_level_builder.place_random_inner_walls(grid_size, walls_map, SOURCES_WALL, TILE_WALL, is_blocked)
+	_level_builder.place_random_inner_walls(grid_size, walls_map, _current_wall_sources, TILE_WALL, is_blocked)
 
 func _is_wall(cell: Vector2i) -> bool:
 	return walls_map.get_cell_source_id(0, cell) != -1
@@ -2792,6 +2904,7 @@ func _prepare_run_layout() -> void:
 	_rune1_plan.clear()
 	_rune2_plan.clear()
 	_rune3_plan.clear()
+	_tileset_plan.clear()
 	var levels: Array[int] = []
 	for i in range(1, _max_level + 1):
 		levels.append(i)
