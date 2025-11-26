@@ -119,6 +119,7 @@ var _debug_bow_outline: Line2D
 var _debug_wand_outline: Line2D
 var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
+var _title_textures: Array[Texture2D] = []
 
 @onready var floor_map: TileMap = $Floor
 @onready var walls_map: TileMap = $Walls
@@ -275,6 +276,10 @@ func _load_spritesheet_textures() -> void:
 	WAND_TEX = _sheet_tex(&"wand", Vector2i(544, 169), true)
 	BOW_TEX = _sheet_tex(&"bow", Vector2i(351, 130), true)
 	ARROW_TEX = _sheet_tex(&"arrow", Vector2i(429, 130), true)
+	_title_textures = [
+		load("res://assets/CoB-title.png"),
+		load("res://assets/cob-title-mb.png")
+	]
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
 		_sheet_tex(&"bone2", Vector2i(13, 494), true),
@@ -2225,6 +2230,11 @@ func _start_game() -> void:
 func _show_title(visible: bool) -> void:
 	_title_layer.visible = visible
 	_over_layer.visible = false
+	if visible and _title_bg and not _title_textures.is_empty():
+		var pick := _rng.randi_range(0, _title_textures.size() - 1)
+		var tex: Texture2D = _title_textures[pick]
+		if tex:
+			_title_bg.texture = tex
 	_title_label.add_theme_font_size_override("font_size", 64)
 	_title_label.offset_top = get_viewport_rect().size.y * 0.5
 

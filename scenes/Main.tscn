@@ -7,6 +7,7 @@
 [ext_resource type="FontFile" path="res://assets/m5x7.ttf" id="5"]
 [ext_resource type="FontFile" uid="uid://lcsi3iekfbl5" path="res://assets/DungeonFont.ttf" id="6"]
 [ext_resource type="Texture2D" uid="uid://bhg4ca6sfvhf4" path="res://assets/CoB-title.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/cob-title-mb.png" id="18"]
 [ext_resource type="Texture2D" uid="uid://c2rxob573x2am" path="res://assets/codex-quest-win.png" id="8"]
 [ext_resource type="Texture2D" uid="uid://l3gvmh8f4b6k" path="res://assets/codex-quest-lose.png" id="9"]
 [ext_resource type="Script" uid="uid://by1ivrwoxrbkv" path="res://scripts/Item.gd" id="17"]
