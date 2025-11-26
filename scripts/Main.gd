@@ -335,6 +335,7 @@ var _bone_cells := {}
 var _bone_spawn_outcomes := {}
 var _web_stuck_turns: int = 0
 var _spiderweb_nodes: Array[Sprite2D] = []
+var _corpse_nodes: Array[Sprite2D] = []
 var _brazier_cells: Array[Vector2i] = []
 var _brazier_nodes: Array[Node2D] = []
 var _level_special_map := {} # level -> special type
@@ -1086,6 +1087,7 @@ func _restart_game() -> void:
 	_web_stuck_turns = 0
 	_brazier_cells.clear()
 	_clear_braziers()
+	_clear_corpses()
 	_clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
@@ -1255,7 +1257,9 @@ func _leave_enemy_corpse(enemy: Enemy) -> void:
 	s.centered = false
 	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	s.global_position = Grid.cell_to_world(enemy.grid_cell)
+	s.z_index = 1
 	_decor.add_child(s)
+	_corpse_nodes.append(s)
 
 func _handle_player_hit() -> void:
 	_apply_player_damage(1)
@@ -1651,6 +1655,7 @@ func _restore_entities_from_state(level: int) -> void:
 	_clear_enemies()
 	_clear_mice()
 	_clear_traps()
+	_clear_corpses()
 	# Restore walls before entities if present
 	_restore_walls_from_state(state)
 	var enemies: Array = state.get("enemies", [])
@@ -1709,7 +1714,9 @@ func _restore_entities_from_state(level: int) -> void:
 			s.centered = false
 			s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			s.global_position = pos
+			s.z_index = 1
 			_decor.add_child(s)
+			_corpse_nodes.append(s)
 
 func _restore_walls_from_state(state: Dictionary) -> void:
 	var walls: Array = state.get("walls", [])
@@ -2031,6 +2038,7 @@ func _clear_enemies() -> void:
 	_skeletons.clear()
 	_clear_mice()
 	_clear_traps()
+	_clear_corpses()
 
 func _clear_mice() -> void:
 	for m in _mice:
@@ -2041,6 +2049,20 @@ func _clear_traps() -> void:
 	for t in _traps:
 		t.queue_free()
 	_traps.clear()
+
+func _clear_corpses() -> void:
+	for c in _corpse_nodes:
+		if c:
+			c.queue_free()
+	_corpse_nodes.clear()
+	if _decor == null:
+		return
+	for child in _decor.get_children():
+		if child is Sprite2D:
+			var spr := child as Sprite2D
+			if spr.texture == DEAD_GOBLIN_TEX or spr.texture == ZOMBIE_TEX_2 or spr.texture == MINO_TEX_2 or spr.texture == SKELETON_TEX_2 or BONE_TEXTURES.has(spr.texture):
+				if not _corpse_nodes.has(spr):
+					spr.queue_free()
 
 func _clear_armor_items() -> void:
 	for a in _armor_nodes:
@@ -2115,6 +2137,8 @@ func _clear_bones() -> void:
 	_bone_cells.clear()
 	_bone_spawn_outcomes.clear()
 	_clear_spiderwebs()
+	_clear_corpses()
+	_clear_corpses()
 
 func _place_bones(grid_size: Vector2i) -> void:
 	var count := _rng.randi_range(5, 30)
@@ -2357,6 +2381,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_door_is_open = false
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
+	_clear_corpses()
 	_clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
@@ -2509,7 +2534,7 @@ func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 	if trap == null:
 		return
 	if trap.trap_type == &"spiderweb":
-		_web_stuck_turns = _rng.randi_range(1, 3)
+		_web_stuck_turns = _rng.randi_range(2, 5)
 		_traps.erase(trap)
 		trap.queue_free()
 		_last_trap_cell = Vector2i(-1, -1)

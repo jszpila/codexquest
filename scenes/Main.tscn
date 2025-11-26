@@ -137,37 +137,92 @@ grow_horizontal = 2
 theme_override_constants/separation = 10
 
 [node name="HUDVitals" type="VBoxContainer" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(160, 64)
+custom_minimum_size = Vector2(240, 64)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 0
 
 [node name="HeartsBorder" type="PanelContainer" parent="HUD/HUDBar/HUDVitals"]
-custom_minimum_size = Vector2(160, 24)
+custom_minimum_size = Vector2(240, 24)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("2")
 
 [node name="Hearts" type="HBoxContainer" parent="HUD/HUDBar/HUDVitals/HeartsBorder"]
-custom_minimum_size = Vector2(160, 24)
+custom_minimum_size = Vector2(240, 24)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 6
 
 [node name="ArmorBorder" type="PanelContainer" parent="HUD/HUDBar/HUDVitals"]
-custom_minimum_size = Vector2(160, 24)
+custom_minimum_size = Vector2(240, 24)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("3")
 
 [node name="Armor" type="HBoxContainer" parent="HUD/HUDBar/HUDVitals/ArmorBorder"]
-custom_minimum_size = Vector2(160, 24)
+custom_minimum_size = Vector2(240, 24)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 6
 
+[node name="HUDLevel" type="Label" parent="HUD/HUDBar"]
+custom_minimum_size = Vector2(128, 48)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 36
+theme_override_styles/normal = SubResource("5")
+text = "Level: 1"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="HUDStats" type="HBoxContainer" parent="HUD/HUDBar"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 4
+
+[node name="HUDATKLabel" type="Label" parent="HUD/HUDBar/HUDStats"]
+custom_minimum_size = Vector2(128, 48)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 36
+theme_override_styles/normal = SubResource("6")
+text = "ATK: 0"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="HUDDEFLabel" type="Label" parent="HUD/HUDBar/HUDStats"]
+custom_minimum_size = Vector2(128, 48)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 36
+theme_override_styles/normal = SubResource("7")
+text = "DEF: 0"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="HUDScore" type="Label" parent="HUD/HUDBar"]
+custom_minimum_size = Vector2(128, 48)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("5")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 36
+theme_override_styles/normal = SubResource("8")
+text = "Score: 0"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="TextSpacer" type="Control" parent="HUD/HUDBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(8, 1)
+size_flags_horizontal = 0
+size_flags_vertical = 4
+
 [node name="SpacerItems" type="Control" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(32, 1)
+custom_minimum_size = Vector2(12, 1)
 layout_mode = 2
 size_flags_vertical = 4
 
@@ -286,71 +341,6 @@ layout_mode = 2
 size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
-
-[node name="TextSpacer" type="Control" parent="HUD/HUDBar"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-
-[node name="SpacerLevel" type="Control" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(8, 1)
-layout_mode = 2
-size_flags_vertical = 4
-
-[node name="HUDLevel" type="Label" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(180, 48)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("5")
-text = "Level: 1"
-horizontal_alignment = 2
-vertical_alignment = 1
-
-[node name="HUDStats" type="HBoxContainer" parent="HUD/HUDBar"]
-layout_mode = 2
-size_flags_vertical = 4
-theme_override_constants/separation = 10
-
-[node name="HUDATKLabel" type="Label" parent="HUD/HUDBar/HUDStats"]
-custom_minimum_size = Vector2(140, 48)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("6")
-text = "ATK: 0"
-horizontal_alignment = 2
-vertical_alignment = 1
-
-[node name="HUDDEFLabel" type="Label" parent="HUD/HUDBar/HUDStats"]
-custom_minimum_size = Vector2(140, 48)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("7")
-text = "DEF: 0"
-horizontal_alignment = 2
-vertical_alignment = 1
-
-[node name="SpacerScore" type="Control" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(32, 1)
-layout_mode = 2
-size_flags_vertical = 4
-
-[node name="HUDScore" type="Label" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(220, 48)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 36
-theme_override_styles/normal = SubResource("8")
-text = "Score: 0"
-horizontal_alignment = 2
-vertical_alignment = 1
-
 [node name="Fade" type="ColorRect" parent="HUD"]
 z_index = 100
 anchors_preset = 15

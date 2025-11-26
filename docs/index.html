@@ -18,8 +18,8 @@ html, body { margin: 0; background: #000; color: #ddd; font-family: system-ui, s
 body {
 	color: white;
 	background-color: black;
-	overflow: hidden;
-	touch-action: none;
+	background-image: url('cob-bg.jpg');
+	background-size: cover;
 }
 
 #canvas {
@@ -98,6 +98,8 @@ body {
 	max-width: 100%;
 	margin: 1rem auto 0 auto;
 	text-align: left;
+	background-color: #000000cc;
+	padding-top: 1rem;
 }
 
 .text-content h1 {
@@ -105,7 +107,7 @@ body {
 }
 
 .text-content h2 {
-	margin: 0 0 0.25rem 0;
+	margin: .5rem 0 0.25rem 0;
 }
 
 .text-content ul {
@@ -118,12 +120,11 @@ body {
 }
 
 .flex-container {
-	display: flex;
-	justify-content: center;
+	max-width: 960px;
+	margin: 0 auto;
 }
 
 .flex-item{
-	flex: 1;
 	padding-right: 1rem
 }
 		</style>
@@ -141,12 +142,12 @@ body {
 			<div class="flex-container">
 				<div class="flex-item">
 					<h2>The Story So Far...</h2>
-					<p>For causes known only to you, you have been thrown down a hole into a pit full of goblins and who knows what else, known as <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must find the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
+					<p>For causes known only to you and Crom, you have been cast into <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must find the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
 				</div>
 				<div class="flex-item">
 					<h2>Controls</h2>
 					<ul>
-						<li>WASD to move</li>
+						<li>WASD or arrow keys to move (diagonal movement supported)</li>
 						<li>Q to use healing potion</li>
 						<li>Z to change zoom level</li>
 					</ul>
@@ -157,9 +158,18 @@ body {
 						<li>The <strong>Sword</strong> grants a +1 attack bonus.</li>
 						<li>The <strong>Shield</strong> grants a +1 defense bonus.</li>
 						<li><strong>Health Potions</strong> restore 1 HP; you can carry 1 at a time.</li>
-						<li><strong>Runes</strong> grant defense or attack bonuses, depending on type.</li>
+						<li><strong>Runes</strong> grant bonuses to attack, defense or max HP.</li>
 						<li>The <strong>Torch</strong> improves visibility.</li>
 					</ul>
+				</div>
+				<div>
+					<h2>Tips</h2>
+					<ul>
+						<li>Mo' levels = mo' monsters</li>
+						<li>Level up every 10 points</li>
+						<li>You can travel back and forth between levels</li>
+					</ul>
+				</div>
 			</div>
 
 			</div>
@@ -176,7 +186,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":1,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":9674176,"index.wasm":36145869},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":1,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":10369860,"index.wasm":36145869},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
