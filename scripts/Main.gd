@@ -163,6 +163,7 @@ var _audio_pool: Array[AudioStreamPlayer] = []
 @onready var _decor: Node2D = $Decor
 @onready var _title_layer: CanvasLayer = $Title
 @onready var _title_label: Label = $Title/TitleLabel
+@onready var _title_build_label: Label = $Title/VersionLabel
 @onready var _over_layer: CanvasLayer = $GameOver
 @onready var _over_label: Label = $GameOver/OverLabel
 @onready var _over_score: Label = $GameOver/OverScore
@@ -532,6 +533,7 @@ func _ready() -> void:
 	# Disable player controls until game starts
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(false)
+	_update_title_build_label()
 	if _fade:
 		# Use opaque black color; modulate controls the visible alpha
 		_fade.color = Color(0, 0, 0, 1)
@@ -2277,6 +2279,7 @@ func _show_game_over(won: bool) -> void:
 		_over_score.add_theme_font_size_override("font_size", 36)
 		_over_score.offset_top = -get_viewport_rect().size.y * 0.12
 		_over_score.text = "EXP: %d" % _score
+	_update_title_build_label()
 
 func _on_viewport_resized() -> void:
 	_resize_fullscreen_art()
@@ -2291,6 +2294,7 @@ func _resize_fullscreen_art() -> void:
 	_title_label.offset_top = viewport_size.y * 0.5
 	if _over_score:
 		_over_score.offset_top = -viewport_size.y * 0.12
+	_update_title_build_label()
 
 func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible
@@ -3673,3 +3677,17 @@ func _trap_at(cell: Vector2i) -> Trap:
 		if t.grid_cell == cell:
 			return t
 	return null
+
+func _build_version_string() -> String:
+	var version_val := str(ProjectSettings.get_setting("application/config/version", ""))
+	var build_ts := str(ProjectSettings.get_setting("application/config/build_timestamp", ""))
+	if version_val != "":
+		return "Version: %s" % version_val
+	if build_ts != "":
+		return "Built: %s" % build_ts
+	return "Built: %s" % Time.get_datetime_string_from_unix_time(Time.get_unix_time_from_system())
+
+func _update_title_build_label() -> void:
+	if _title_build_label == null:
+		return
+	_title_build_label.text = _build_version_string()
