@@ -58,6 +58,9 @@ const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
 const DEBUG_SPAWN_ALL_ITEMS := false
 const EARLY_LEVEL_WEIGHT := 3
+const ACTION_LOG_MAX := 5
+const ACTION_LOG_OPACITIES := [1.0, 0.8, 0.6, 0.4, 0.2]
+const ACTION_LOG_FONT_SIZE := 28
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -124,6 +127,7 @@ var _projectile_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
 var _audio_pool: Array[AudioStreamPlayer] = []
 var _debug_items: Array[Item] = []
+var _action_log: Array[String] = []
 @onready var _loading_label: Label = $HUD/LoadingLabel
 
 @onready var floor_map: TileMap = $Floor
@@ -149,6 +153,9 @@ var _debug_items: Array[Item] = []
 @onready var _hud_bow_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot
 @onready var _hud_wand_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot
 @onready var _hud_arrow_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDArrows
+@onready var _action_log_box: VBoxContainer = $ActionLogLayer/ActionLog
+var _hud_action_lines: Array[Label] = []
+const ACTION_LOG_FONT := preload("res://assets/m5x7.ttf")
 @onready var _hud_armor: HBoxContainer = $HUD/HUDBar/HUDVitals/ArmorBorder/Armor
 @onready var _hud_player_level: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDPlayerLevel
 @onready var _hud_atk_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDATKLabel
@@ -529,6 +536,7 @@ func _ready() -> void:
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
 	_resize_fullscreen_art()
+	_init_action_log_labels()
 	# Start at title screen
 	_state = STATE_TITLE
 	_show_title(true)
@@ -619,12 +627,15 @@ func _process(_delta: float) -> void:
 		if ktype == &"key1":
 			_key1_collected = true
 			_key1_icon_persistent = true
+			_log_action("Picked up Key 1")
 		elif ktype == &"key2":
 			_key2_collected = true
 			_key2_icon_persistent = true
+			_log_action("Picked up Key 2")
 		elif ktype == &"key3":
 			_key3_collected = true
 			_key3_icon_persistent = true
+			_log_action("Picked up Key 3")
 		print("GOT KEY")
 		if _key_node:
 			_key_node.collect()
@@ -642,6 +653,7 @@ func _process(_delta: float) -> void:
 			_update_player_sprite_appearance()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
+			_log_action("Picked up Sword")
 	# Potions (supports two on level 2+); collect into inventory if available and not already carrying one
 		_pickup_potion_if_available(cp)
 	# Special pickups (codex, crown, ring)
@@ -656,6 +668,7 @@ func _process(_delta: float) -> void:
 		_update_door_texture()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_log_action("Picked up Codex")
 		_check_win()
 		_check_win()
 	elif st == &"crown" and not _crown_collected and cp == _codex_cell:
@@ -668,6 +681,7 @@ func _process(_delta: float) -> void:
 		_update_door_texture()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_log_action("Picked up Crown")
 	_debug_check_special_pickups(cp)
 	if not _shield_collected and cp == _shield_cell:
 		_shield_collected = true
@@ -678,6 +692,7 @@ func _process(_delta: float) -> void:
 			_update_player_sprite_appearance()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
+			_log_action("Picked up Shield")
 	if not _wand_collected and cp == _wand_cell:
 		_wand_collected = true
 		_wand_cell = Vector2i(-1, -1)
@@ -689,6 +704,7 @@ func _process(_delta: float) -> void:
 		_blink_node(player)
 		_add_score(1)
 		_update_hud_icons()
+		_log_action("Picked up Wand")
 	if not _bow_collected and cp == _bow_cell:
 		_bow_collected = true
 		_bow_cell = Vector2i(-1, -1)
@@ -700,6 +716,7 @@ func _process(_delta: float) -> void:
 		_blink_node(player)
 		_add_score(1)
 		_update_hud_icons()
+		_log_action("Picked up Bow")
 	# Torch pickup: extends FOV by +4 for the rest of the run
 	if not _torch_collected and cp == _torch_cell:
 		_torch_collected = true
@@ -710,6 +727,7 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_log_action("Picked up Torch")
 	if not _ring_collected and _current_level_special_type() == &"ring" and cp == _ring_cell:
 		_ring_collected = true
 		print("GOT RING")
@@ -719,6 +737,7 @@ func _process(_delta: float) -> void:
 		_blink_node(player)
 		_add_score(1)
 		_ring_cell = Vector2i(-1, -1)
+		_log_action("Picked up Ring")
 
 	if not _game_over:
 		var enemy: Enemy = _get_enemy_at(cp)
@@ -741,6 +760,7 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Got Rune-1 (+1 ATK)")
 				break
 		for r2 in _rune2_nodes:
 			if r2 != null and not r2.collected and cp == r2.grid_cell:
@@ -750,6 +770,7 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Got Rune-2 (+1 DEF)")
 				break
 		for r3 in _rune3_nodes:
 			if r3 != null and not r3.collected and cp == r3.grid_cell:
@@ -763,6 +784,7 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Got Rune-3 (+1 MAX HP)")
 				break
 		for ar in _armor_nodes:
 			if ar != null and not ar.collected and cp == ar.grid_cell:
@@ -773,6 +795,7 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Picked up Armor")
 				break
 	# Check win condition each frame after movement/collisions
 	_check_win()
@@ -1414,6 +1437,7 @@ func _restart_game() -> void:
 			anode.collected = true
 	_brazier_cells.clear()
 	_clear_braziers()
+	_clear_action_log()
 	_clear_corpses()
 	_clear_enemies()
 	_clear_runes()
@@ -1483,6 +1507,44 @@ func _set_icon_visible(icon: Control, should_show: bool) -> void:
 		return
 	icon.visible = true
 	icon.modulate.a = (1.0 if should_show else 0.0)
+
+func _init_action_log_labels() -> void:
+	_hud_action_lines.clear()
+	if _action_log_box == null:
+		return
+	for child in _action_log_box.get_children():
+		if child is Label:
+			var lbl := child as Label
+			_hud_action_lines.append(lbl)
+			lbl.add_theme_font_override("font", ACTION_LOG_FONT)
+			lbl.add_theme_font_size_override("font_size", ACTION_LOG_FONT_SIZE)
+	_refresh_action_log()
+
+func _refresh_action_log() -> void:
+	if _hud_action_lines.is_empty():
+		return
+	for i in range(_hud_action_lines.size()):
+		var line: Label = _hud_action_lines[i]
+		if line == null:
+			continue
+		var text := ""
+		if i < _action_log.size():
+			text = _action_log[i]
+		line.text = text
+		var alpha: float = ACTION_LOG_OPACITIES[i] if i < ACTION_LOG_OPACITIES.size() else ACTION_LOG_OPACITIES.back()
+		line.modulate = Color(1, 1, 1, alpha if text != "" else 0.0)
+
+func _log_action(text: String) -> void:
+	if text.is_empty():
+		return
+	_action_log.insert(0, text)
+	while _action_log.size() > ACTION_LOG_MAX:
+		_action_log.pop_back()
+	_refresh_action_log()
+
+func _clear_action_log() -> void:
+	_action_log.clear()
+	_refresh_action_log()
 
 func _apply_ranged_highlight() -> void:
 	if _hud_bow_panel:
@@ -1664,6 +1726,7 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 		player_roll += _attack_bonus()
 		enemy_roll -= _defense_bonus()
 		print("Player rolls ", player_roll, ", ", enemy.enemy_type, " rolls ", enemy_roll)
+		_log_action("Roll: Player %d vs %s %d" % [player_roll, String(enemy.enemy_type), enemy_roll])
 		if player_roll == enemy_roll:
 			if force_outcome:
 				continue
@@ -1708,26 +1771,32 @@ func _maybe_level_up() -> void:
 
 func _apply_level_up_reward() -> void:
 	var roll := _rng.randf()
+	var log_msg := "Level up:"
 	if roll < 0.4:
 		_attack_level_bonus += 1
 		print("LEVEL UP: +1 ATK (bonus=", _attack_level_bonus, ")")
+		log_msg += " +1 ATK"
 	elif roll < 0.8:
 		_defense_level_bonus += 1
 		print("LEVEL UP: +1 DEF (bonus=", _defense_level_bonus, ")")
+		log_msg += " +1 DEF"
 	else:
 		if _hp_max < HP_MAX_LIMIT:
 			_hp_max = min(HP_MAX_LIMIT, _hp_max + 1)
 			print("LEVEL UP: +1 MAX HP (max=", _hp_max, ")")
+			log_msg += " +1 MAX HP"
 		else:
 			_attack_level_bonus += 1
 			_defense_level_bonus += 1
 			print("LEVEL UP: +1 ATK and +1 DEF (max HP already at limit)")
+			log_msg += " +1 ATK +1 DEF"
 	if _hp_current < _hp_max:
 		_hp_current = min(_hp_max, _hp_current + 1)
 	_update_hud_hearts()
 	_update_hud_icons()
 	_play_sfx(SFX_LEVEL_UP)
 	_blink_node_colored(player, Color(0.776, 0.624, 0.153))
+	_log_action(log_msg)
 
 func _leave_enemy_corpse(enemy: Enemy) -> void:
 	if _decor == null or enemy == null:
@@ -2358,6 +2427,7 @@ func _start_game() -> void:
 	_brazier_cells.clear()
 	_clear_braziers()
 	_clear_debug_items()
+	_clear_action_log()
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
@@ -2645,6 +2715,7 @@ func _spawn_skeleton_at(cell: Vector2i) -> void:
 	add_child(node)
 	_register_enemy(node)
 	_skeletons.append(node)
+	_log_action("AHHHHH!!!!")
 
 func _clear_enemies() -> void:
 	for child: Goblin in _goblins:
@@ -3069,6 +3140,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_update_hud_armor()
 	if _hud_level:
 		_hud_level.text = "FLR: %d" % _level
+	_log_action("Traveled to Floor %d" % _level)
 	_update_fov()
 	_set_world_visible(true)
 	print("[DEBUG] Travel complete -> level ", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " door_cell=", _door_cell, " entrance_cell=", _entrance_cell)
@@ -3104,6 +3176,8 @@ func _update_hud_icons() -> void:
 		_hud_level.text = "FLR: %d" % _level
 	if _hud_hearts:
 		_hud_hearts.visible = show
+	if _action_log_box:
+		_action_log_box.visible = show
 	if _hud_icon_key1 and KEY_TEX_1:
 		_hud_icon_key1.texture = KEY_TEX_1
 	if _hud_icon_key2 and KEY_TEX_2:
@@ -3182,6 +3256,7 @@ func _pickup_potion_if_available(cell: Vector2i) -> void:
 		_play_sfx(SFX_PICKUP1)
 		_blink_node(player)
 		_update_hud_icons()
+		_log_action("Picked up Potion")
 
 func _pickup_arrows_if_available(cell: Vector2i) -> void:
 	var gained := 0
@@ -3197,6 +3272,7 @@ func _pickup_arrows_if_available(cell: Vector2i) -> void:
 		_play_sfx(SFX_PICKUP1)
 		_blink_node(player)
 		_update_hud_icons()
+		_log_action("Picked up Arrows (+%d)" % gained)
 
 func _try_use_potion() -> void:
 	if not _carried_potion:
@@ -3209,6 +3285,7 @@ func _try_use_potion() -> void:
 	_update_hud_icons()
 	_play_sfx(SFX_PICKUP1)
 	_blink_node(player)
+	_log_action("That's better")
 
 func _ranged_dir_from_input() -> Vector2i:
 	# Allow combining held cardinals (e.g., J+I) to produce diagonals
@@ -3309,6 +3386,7 @@ func _cast_wand(dir: Vector2i) -> void:
 	var origin := Grid.world_to_cell(player.global_position)
 	var hit := false
 	_play_sfx(SFX_WAND)
+	_log_action("ZAP!")
 	_flash_cone(dir, origin, 3, Color(0.6, 0.3, 0.8, 0.55))
 	for offset in _cone_cells(dir, 3):
 		var target := origin + offset
@@ -3355,6 +3433,7 @@ func _shoot_bow(dir: Vector2i) -> bool:
 		if enemy != null:
 			path_end = target
 			if _bow_missed(origin, target):
+				_log_action("Whiff!")
 				break
 			_play_sfx(SFX_HURT1)
 			_blink_node(enemy)
@@ -3362,6 +3441,7 @@ func _shoot_bow(dir: Vector2i) -> bool:
 			if not enemy.alive:
 				_handle_enemy_death(enemy)
 				_check_win()
+			_log_action("Gotcha!")
 			break
 		var trap := _trap_at(target)
 		if trap != null:
@@ -3449,9 +3529,11 @@ func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 		_traps.erase(trap)
 		trap.queue_free()
 		_last_trap_cell = Vector2i(-1, -1)
+		_log_action("Stuck!")
 		return
 	_apply_trap_damage()
 	_last_trap_cell = cell
+	_log_action("Ouch!")
 
 func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 	if enemy == null or not enemy.alive:

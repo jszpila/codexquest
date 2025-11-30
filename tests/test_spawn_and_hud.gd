@@ -57,3 +57,23 @@ func test_weighted_selection_prefers_early_levels() -> void:
 			late += 1
 	assert_true(early > late, "Early levels should be sampled more frequently than later levels")
 	main.queue_free()
+
+func test_action_log_inserts_at_top_and_limits_size() -> void:
+	var main: Node = _fresh_main()
+	main._action_log.clear()
+	main._hud_action_lines = []
+	for _i in range(3):
+		var lbl := Label.new()
+		main._hud_action_lines.append(lbl)
+		main._action_log_box = VBoxContainer.new()
+		main._action_log_box.add_child(lbl)
+	main._log_action("First")
+	main._log_action("Second")
+	main._log_action("Third")
+	assert_eq(main._action_log.size(), 3, "Action log should hold three entries")
+	assert_eq(main._action_log[0], "Third", "Newest entry should be at the top")
+	main._log_action("Fourth")
+	main._log_action("Fifth")
+	assert_true(main._action_log.size() <= main.ACTION_LOG_MAX, "Action log should clamp to max size")
+	assert_eq(main._action_log[0], "Fifth", "Newest entry should remain at the top")
+	main.queue_free()
