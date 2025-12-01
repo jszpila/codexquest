@@ -5,6 +5,7 @@ const Enemy := preload("res://scripts/Enemy.gd")
 const Goblin := preload("res://scripts/Goblin.gd")
 const Zombie := preload("res://scripts/Zombie.gd")
 const Minotaur := preload("res://scripts/Minotaur.gd")
+const Imp := preload("res://scripts/Imp.gd")
 const Mouse := preload("res://scripts/Mouse.gd")
 const Skeleton := preload("res://scripts/Skeleton.gd")
 const Trap := preload("res://scripts/Trap.gd")
@@ -12,6 +13,7 @@ const Item := preload("res://scripts/Item.gd")
 const GOBLIN_SCENE: PackedScene = preload("res://scenes/Goblin.tscn")
 const ZOMBIE_SCENE: PackedScene = preload("res://scenes/Zombie.tscn")
 const MINOTAUR_SCENE: PackedScene = preload("res://scenes/Minotaur.tscn")
+const IMP_SCENE: PackedScene = preload("res://scenes/Imp.tscn")
 const SKELETON_SCENE: PackedScene = preload("res://scenes/Skeleton.tscn")
 const MOUSE_SCENE: PackedScene = preload("res://scenes/Mouse.tscn")
 const TRAP_SCENE: PackedScene = preload("res://scenes/Trap.tscn")
@@ -54,13 +56,27 @@ const RANGED_WAND := &"wand"
 const RANGED_BOW := &"bow"
 const RANGED_NONE := &"none"
 const ARROWS_PER_PICKUP := 3
+const RUNE4_DASH_RANGE := 5
+const RUNE4_DASH_COOLDOWN_MOVES := 20
 const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
 const DEBUG_SPAWN_ALL_ITEMS := false
+const DEBUG_SPAWN_CHEESE := false
+const RANGED_INPUT_LOCK := 0.12
+const EARLY_LEVEL_WEIGHT := 3
+const ACTION_LOG_MAX := 5
+const ACTION_LOG_OPACITIES := [1.0, 0.8, 0.6, 0.4, 0.2]
+const ACTION_LOG_FONT_SIZE := 28
+const FINAL_DOOR_PULSE_SCALE := 0.06
+const FINAL_DOOR_PULSE_TIME := 0.6
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
 var PLAYER_TEX_4: Texture2D
+var PLAYER_TEX_WAND: Texture2D
+var PLAYER_TEX_BOW: Texture2D
+var PLAYER_TEX_TORCH: Texture2D
+var PLAYER_TEX_DEAD: Texture2D
 var HEART_TEX: Texture2D
 var GOBLIN_TEX_1: Texture2D
 var DEAD_GOBLIN_TEX: Texture2D
@@ -68,6 +84,8 @@ var ZOMBIE_TEX_1: Texture2D
 var ZOMBIE_TEX_2: Texture2D
 var MINO_TEX_1: Texture2D
 var MINO_TEX_2: Texture2D
+var IMP_TEX: Texture2D
+var IMP_DEAD_TEX: Texture2D
 var SKELETON_TEX_1: Texture2D
 var SKELETON_TEX_2: Texture2D
 var DOOR_TEX_1: Texture2D
@@ -85,8 +103,10 @@ var CROWN_TEX: Texture2D
 var RUNE1_TEX: Texture2D
 var RUNE2_TEX: Texture2D
 var RUNE3_TEX: Texture2D
+var RUNE4_TEX: Texture2D
 var TORCH_TEX: Texture2D
 var RING_TEX: Texture2D
+var CHEESE_TEX: Texture2D
 var ARMOR_ICON_TEX: Texture2D
 var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
@@ -120,9 +140,14 @@ var _debug_bow_outline: Line2D
 var _debug_wand_outline: Line2D
 var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
+var _dash_trail_pool: Array[Line2D] = []
+var _dash_trail_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
+var _win_textures: Array[Texture2D] = []
+var _lose_textures: Array[Texture2D] = []
 var _audio_pool: Array[AudioStreamPlayer] = []
 var _debug_items: Array[Item] = []
+var _action_log: Array[String] = []
 @onready var _loading_label: Label = $HUD/LoadingLabel
 
 @onready var floor_map: TileMap = $Floor
@@ -140,14 +165,19 @@ var _debug_items: Array[Item] = []
 @onready var _hud_icon_rune1: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune1Icon
 @onready var _hud_icon_rune2: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune2Icon
 @onready var _hud_icon_rune3: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune3Icon
+@onready var _hud_icon_rune4: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune4Icon
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRingIcon
 @onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDPotionIcon
+@onready var _hud_icon_cheese: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDCheeseIcon
 @onready var _hud_icon_bow: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot/HUDBowIcon
 @onready var _hud_icon_wand: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot/HUDWandIcon
 @onready var _hud_bow_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot
 @onready var _hud_wand_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot
 @onready var _hud_arrow_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDArrows
+@onready var _action_log_box: VBoxContainer = $ActionLogLayer/ActionLog
+var _hud_action_lines: Array[Label] = []
+const ACTION_LOG_FONT := preload("res://assets/m5x7.ttf")
 @onready var _hud_armor: HBoxContainer = $HUD/HUDBar/HUDVitals/ArmorBorder/Armor
 @onready var _hud_player_level: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDPlayerLevel
 @onready var _hud_atk_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDATKLabel
@@ -168,7 +198,9 @@ var _debug_items: Array[Item] = []
 @onready var _title_build_label: Label = $Title/VersionLabel
 @onready var _over_layer: CanvasLayer = $GameOver
 @onready var _over_label: Label = $GameOver/OverLabel
+@onready var _over_result: Label = $GameOver/OverResult
 @onready var _over_score: Label = $GameOver/OverScore
+@onready var _over_cause: Label = $GameOver/OverCause
 @onready var _title_bg: TextureRect = $Title/TitleBG
 @onready var _over_bg_win: TextureRect = $GameOver/OverBGWin
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
@@ -246,13 +278,19 @@ func _load_spritesheet_textures() -> void:
 	PLAYER_TEX_2 = _sheet_tex(&"player2", Vector2i(1456, 0), true)
 	PLAYER_TEX_3 = _sheet_tex(&"player3", Vector2i(1937, 0), true)
 	PLAYER_TEX_4 = _sheet_tex(&"player4", Vector2i(1989, 0), true)
+	PLAYER_TEX_WAND = _sheet_tex(&"player_wand", Vector2i(1625, 0), true)
+	PLAYER_TEX_BOW = _sheet_tex(&"player_bow", Vector2i(2028, 0), true)
+	PLAYER_TEX_TORCH = _sheet_tex(&"player_torch", Vector2i(1898, 0), true)
+	PLAYER_TEX_DEAD = _sheet_tex(&"player_dead", Vector2i(2613, 0), true)
 	HEART_TEX = _sheet_tex(&"heart", Vector2i(1014, 481), true)
 	GOBLIN_TEX_1 = _sheet_tex(&"goblin1", Vector2i(1352, 52), true)
 	DEAD_GOBLIN_TEX = _sheet_tex(&"goblin_dead", Vector2i(2613, 52), true)
-	ZOMBIE_TEX_1 = _sheet_tex(&"zombie1", Vector2i(1352, 117), true)
+	ZOMBIE_TEX_1 = _sheet_tex(&"zombie1", Vector2i(2626, 117), true)
 	ZOMBIE_TEX_2 = _sheet_tex(&"zombie2", Vector2i(2613, 117), true)
 	MINO_TEX_1 = _sheet_tex(&"mino1", Vector2i(1352, 208), true)
 	MINO_TEX_2 = _sheet_tex(&"mino2", Vector2i(2613, 208), true)
+	IMP_TEX = _sheet_tex(&"imp", Vector2i(2028, 260), true)
+	IMP_DEAD_TEX = _sheet_tex(&"imp_dead", Vector2i(2613, 260), true)
 	SKELETON_TEX_1 = _sheet_tex(&"skeleton1", Vector2i(1352, 130), true)
 	SKELETON_TEX_2 = _sheet_tex(&"skeleton_dead", Vector2i(2613, 130), true)
 	var mouse_tex := _sheet_tex(&"mouse", Vector2i(39, 182), true)
@@ -271,8 +309,10 @@ func _load_spritesheet_textures() -> void:
 	RUNE1_TEX = _sheet_tex(&"rune1", Vector2i(338, 221), true)
 	RUNE2_TEX = _sheet_tex(&"rune2", Vector2i(351, 221), true)
 	RUNE3_TEX = _sheet_tex(&"rune3", Vector2i(364, 221), true)
+	RUNE4_TEX = _sheet_tex(&"rune4", Vector2i(455, 221), true)
 	TORCH_TEX = _sheet_tex(&"torch", Vector2i(52, 546), true)
 	RING_TEX = _sheet_tex(&"ring", Vector2i(156, 559), true)
+	CHEESE_TEX = _sheet_tex(&"cheese", Vector2i(91, 221), true)
 	ARMOR_ICON_TEX = _sheet_tex(&"armor_icon", Vector2i(338, 156), true)
 	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
 	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
@@ -283,7 +323,18 @@ func _load_spritesheet_textures() -> void:
 	ARROW_TEX = _sheet_tex(&"arrow", Vector2i(429, 130), true)
 	_title_textures = [
 		load("res://assets/CoB-title.png"),
-		load("res://assets/cob-title-mb.png")
+		load("res://assets/cob-title-mb.png"),
+		load("res://assets/cob-title-comic.png")
+	]
+	_win_textures = [
+		load("res://assets/codex-quest-win.png"),
+		load("res://assets/win-mb.png"),
+		load("res://assets/win-comic.png")
+	]
+	_lose_textures = [
+		load("res://assets/codex-quest-lose.png"),
+		load("res://assets/lose-mb.png"),
+		load("res://assets/lose-comic.png")
 	]
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
@@ -411,9 +462,11 @@ var _armor_cells: Array[Vector2i] = []
 var _rune1_cells: Array[Vector2i] = []
 var _rune2_cells: Array[Vector2i] = []
 var _rune3_cells: Array[Vector2i] = []
+var _rune4_cells: Array[Vector2i] = []
 var _torch_cell: Vector2i = Vector2i.ZERO
 var _ring_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
+var _cheese_cell: Vector2i = Vector2i.ZERO
 var _key_collected: bool = false
 var _key_on_level: bool = false
 var _entrance_cell: Vector2i = Vector2i.ZERO
@@ -427,10 +480,12 @@ var _armor_current: int = 0
 var _rune1_collected_count: int = 0
 var _rune2_collected_count: int = 0
 var _rune3_collected_count: int = 0
+var _rune4_collected_count: int = 0
 var _torch_collected: bool = false
 var _ring_collected: bool = false
 var _codex_collected: bool = false
 var _crown_collected: bool = false
+var _cheese_collected: bool = false
 var _key1_icon_persistent: bool = false
 var _key2_icon_persistent: bool = false
 var _key3_icon_persistent: bool = false
@@ -452,6 +507,7 @@ var _carried_potion: bool = false
 var _goblins: Array[Goblin] = []
 var _zombies: Array[Zombie] = []
 var _minotaurs: Array[Minotaur] = []
+var _imps: Array[Imp] = []
 var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
@@ -462,8 +518,10 @@ var _armor_nodes: Array[Item] = []
 var _rune1_nodes: Array[Item] = []
 var _rune2_nodes: Array[Item] = []
 var _rune3_nodes: Array[Item] = []
+var _rune4_nodes: Array[Item] = []
 var _torch_node: Item
 var _ring_node: Item
+var _cheese_node: Item
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
@@ -480,6 +538,8 @@ var _spiderweb_nodes: Array[Sprite2D] = []
 var _corpse_nodes: Array[Sprite2D] = []
 var _brazier_cells: Array[Vector2i] = []
 var _brazier_nodes: Array[Node2D] = []
+var _door_glow: PointLight2D
+var _door_pulse_tween: Tween
 var _level_special_map := {} # level -> special type
 var _special_levels := {} # special type -> level
 var _level_key_map := {} # level -> key type
@@ -487,6 +547,7 @@ var _armor_plan := {} # level -> count
 var _rune1_plan := {} # level -> count
 var _rune2_plan := {}
 var _rune3_plan := {}
+var _rune4_plan := {}
 var _arrow_plan := {} # level -> 0/1 arrow pickup
 var _level_states := {}
 var _wand_level: int = 1
@@ -494,6 +555,11 @@ var _bow_level: int = 1
 var _arrow_count: int = 0
 var _active_ranged_weapon: StringName = RANGED_NONE
 var _player_level: int = 0
+var _rune4_dash_cooldown: int = 0
+var _last_death_cause: StringName = StringName()
+var _ranged_fire_lock: float = 0.0
+var _cheese_given: bool = false
+var _cheese_level: int = -1
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -528,6 +594,7 @@ func _ready() -> void:
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
 	_resize_fullscreen_art()
+	_init_action_log_labels()
 	# Start at title screen
 	_state = STATE_TITLE
 	_show_title(true)
@@ -563,6 +630,7 @@ func _hide_loading() -> void:
 
 func _process(_delta: float) -> void:
 	# Title state: wait for Enter to start
+	_ranged_fire_lock = max(0.0, _ranged_fire_lock - _delta)
 	if _state == STATE_TITLE:
 		if Input.is_action_just_pressed("start"):
 			_start_game()
@@ -587,8 +655,9 @@ func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("switch_ranged"):
 		_cycle_ranged_weapon()
 	var ranged_dir := _ranged_dir_from_input()
-	if ranged_dir != Vector2i.ZERO:
+	if ranged_dir != Vector2i.ZERO and _ranged_fire_lock <= 0.0:
 		if _fire_ranged(ranged_dir):
+			_ranged_fire_lock = RANGED_INPUT_LOCK
 			return
 	# proceed with gameplay checks
 	# Simple collision checks on grid
@@ -618,12 +687,15 @@ func _process(_delta: float) -> void:
 		if ktype == &"key1":
 			_key1_collected = true
 			_key1_icon_persistent = true
+			_log_action("Picked up Gold Key")
 		elif ktype == &"key2":
 			_key2_collected = true
 			_key2_icon_persistent = true
+			_log_action("Picked up Bronze Key")
 		elif ktype == &"key3":
 			_key3_collected = true
 			_key3_icon_persistent = true
+			_log_action("Picked up Silver Key")
 		print("GOT KEY")
 		if _key_node:
 			_key_node.collect()
@@ -641,6 +713,7 @@ func _process(_delta: float) -> void:
 			_update_player_sprite_appearance()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
+			_log_action("Picked up Sword")
 	# Potions (supports two on level 2+); collect into inventory if available and not already carrying one
 		_pickup_potion_if_available(cp)
 	# Special pickups (codex, crown, ring)
@@ -655,6 +728,7 @@ func _process(_delta: float) -> void:
 		_update_door_texture()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_log_action("Picked up Codex")
 		_check_win()
 		_check_win()
 	elif st == &"crown" and not _crown_collected and cp == _codex_cell:
@@ -667,6 +741,7 @@ func _process(_delta: float) -> void:
 		_update_door_texture()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+		_log_action("Picked up Crown")
 	_debug_check_special_pickups(cp)
 	if not _shield_collected and cp == _shield_cell:
 		_shield_collected = true
@@ -677,6 +752,7 @@ func _process(_delta: float) -> void:
 			_update_player_sprite_appearance()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
+			_log_action("Picked up Shield")
 	if not _wand_collected and cp == _wand_cell:
 		_wand_collected = true
 		_wand_cell = Vector2i(-1, -1)
@@ -687,7 +763,9 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_update_player_sprite_appearance()
 		_update_hud_icons()
+		_log_action("Picked up Wand")
 	if not _bow_collected and cp == _bow_cell:
 		_bow_collected = true
 		_bow_cell = Vector2i(-1, -1)
@@ -698,7 +776,9 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_update_player_sprite_appearance()
 		_update_hud_icons()
+		_log_action("Picked up Bow")
 	# Torch pickup: extends FOV by +4 for the rest of the run
 	if not _torch_collected and cp == _torch_cell:
 		_torch_collected = true
@@ -709,6 +789,19 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_update_player_sprite_appearance()
+		_log_action("Picked up Torch")
+	if not _cheese_collected and not _cheese_given and cp == _cheese_cell:
+		_cheese_collected = true
+		_cheese_cell = Vector2i(-1, -1)
+		print("GOT CHEESE")
+		if _cheese_node:
+			_cheese_node.collect()
+		_play_sfx(SFX_PICKUP1)
+		_blink_node(player)
+		_add_score(1)
+		_update_hud_icons()
+		_log_action("Picked up Cheese")
 	if not _ring_collected and _current_level_special_type() == &"ring" and cp == _ring_cell:
 		_ring_collected = true
 		print("GOT RING")
@@ -718,6 +811,7 @@ func _process(_delta: float) -> void:
 		_blink_node(player)
 		_add_score(1)
 		_ring_cell = Vector2i(-1, -1)
+		_log_action("Picked up Ring")
 
 	if not _game_over:
 		var enemy: Enemy = _get_enemy_at(cp)
@@ -740,6 +834,7 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Got Rune-1 (+1 ATK)")
 				break
 		for r2 in _rune2_nodes:
 			if r2 != null and not r2.collected and cp == r2.grid_cell:
@@ -749,6 +844,7 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Got Rune-2 (+1 DEF)")
 				break
 		for r3 in _rune3_nodes:
 			if r3 != null and not r3.collected and cp == r3.grid_cell:
@@ -762,6 +858,17 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Got Rune-3 (+1 MAX HP)")
+				break
+		for r4 in _rune4_nodes:
+			if r4 != null and not r4.collected and cp == r4.grid_cell:
+				_rune4_collected_count += 1
+				print("GOT RUNE-4 (Dash Attack)")
+				r4.collect()
+				_play_sfx(SFX_PICKUP2)
+				_blink_node(player)
+				_add_score(1)
+				_log_action("Got Rune-4 (Dash Attack)")
 				break
 		for ar in _armor_nodes:
 			if ar != null and not ar.collected and cp == ar.grid_cell:
@@ -772,7 +879,9 @@ func _process(_delta: float) -> void:
 				_play_sfx(SFX_PICKUP2)
 				_blink_node(player)
 				_add_score(1)
+				_log_action("Picked up Armor")
 				break
+		_try_give_cheese(cp)
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -794,32 +903,101 @@ func _on_player_attempt_move() -> bool:
 		return false
 	return true
 
+func _on_player_dash_attempt(dir: Vector2i) -> bool:
+	if dir == Vector2i.ZERO or _state != STATE_PLAYING or _is_transitioning:
+		return false
+	if not _has_rune4():
+		return false
+	if _rune4_dash_cooldown > 0:
+		return false
+	var step_dir := Vector2i(sign(dir.x), sign(dir.y))
+	if step_dir == Vector2i.ZERO:
+		return false
+	var origin := Grid.world_to_cell(player.global_position)
+	var path: Array[Vector2i] = [origin]
+	var target: Enemy = null
+	var target_cell := origin
+	for i in range(1, RUNE4_DASH_RANGE + 1):
+		var c := origin + step_dir * i
+		if not _in_interior(c) or _is_wall(c):
+			break
+		target_cell = c
+		var enemy := _get_enemy_at(c)
+		if enemy != null:
+			target = enemy
+			break
+		path.append(c)
+	if target == null:
+		return false
+	_play_sfx(SFX_HURT1)
+	_log_action("Dash strike!")
+	_blink_node(target)
+	target.apply_damage(1)
+	var enemy_died := not target.alive
+	if not target.alive:
+		_handle_enemy_death(target)
+		_check_win()
+	_rune4_dash_cooldown = RUNE4_DASH_COOLDOWN_MOVES + 1
+	var landing_cell := target_cell if enemy_died else (path[-1] if path.size() > 1 else origin)
+	var trail_cells: Array[Vector2i] = [origin]
+	for cell in path:
+		if trail_cells[-1] != cell:
+			trail_cells.append(cell)
+	if trail_cells[-1] != landing_cell:
+		trail_cells.append(landing_cell)
+	if landing_cell == origin and target_cell != landing_cell and trail_cells[-1] != target_cell:
+		trail_cells.append(target_cell)
+	_show_dash_trail(trail_cells)
+	player.teleport_to_cell(landing_cell)
+	if landing_cell != origin:
+		_on_player_moved(landing_cell)
+	else:
+		_advance_enemies_and_update(_skeletons.size())
+	return true
+
+func _enemy_can_act(enemy: Enemy) -> bool:
+	if enemy == null:
+		return false
+	if enemy.web_stuck_turns > 0:
+		enemy.web_stuck_turns = max(0, enemy.web_stuck_turns - 1)
+		return false
+	return true
+
 func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
+	var prev_dash_cd := _rune4_dash_cooldown
 	# 75% chance each goblin attempts to move 1 step in a random dir
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for goblin: Goblin in _goblins:
-		if goblin.alive and _rng.randf() <= 0.75:
+		if goblin.alive and _enemy_can_act(goblin) and _rng.randf() <= 0.75:
 			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_goblin(goblin, d)
 	for mouse: Mouse in _mice:
-		if mouse.alive and _rng.randf() <= 0.75:
+		if mouse.alive and _enemy_can_act(mouse) and _rng.randf() <= 0.75:
 			var d2: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_mouse(mouse, d2)
 	# Move zombie (one per level) with low accuracy towards player, less accurate at distance
 	for zombie: Zombie in _zombies:
-		if zombie.alive:
+		if zombie.alive and _enemy_can_act(zombie):
 			_move_homing_enemy(zombie)
+			_update_facing_to_player(zombie)
 	for i in range(_skeletons.size()):
 		var skeleton := _skeletons[i]
 		if i >= skip_skeletons_from:
 			continue
-		if skeleton.alive:
+		if skeleton.alive and _enemy_can_act(skeleton):
 			_move_homing_enemy(skeleton)
 	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
 	for mino: Minotaur in _minotaurs:
-		if mino.alive:
+		if mino.alive and _enemy_can_act(mino):
 			_move_homing_enemy(mino)
+	for imp: Imp in _imps:
+		if imp.alive and _enemy_can_act(imp):
+			_imp_take_turn(imp)
 	_update_fov()
+	if _rune4_dash_cooldown > 0:
+		_rune4_dash_cooldown = max(0, _rune4_dash_cooldown - 1)
+	if prev_dash_cd != _rune4_dash_cooldown:
+		_update_hud_icons()
 
 func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 	var dest: Vector2i = goblin.grid_cell + dir
@@ -900,6 +1078,100 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 	if trap2 != null:
 		_handle_enemy_hit_by_trap(enemy, trap2)
 
+func _update_facing_to_player(enemy: Enemy) -> void:
+	if enemy == null:
+		return
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var spr := enemy.get_node_or_null("Sprite2D") as Sprite2D
+	if spr == null:
+		return
+	spr.flip_h = player_cell.x > enemy.grid_cell.x
+
+func _move_enemy_away_from_player(enemy: Enemy) -> void:
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var start_dist: int = abs(enemy.grid_cell.x - player_cell.x) + abs(enemy.grid_cell.y - player_cell.y)
+	var dirs: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+	var best: Array[Vector2i] = []
+	var best_dist: int = start_dist
+	for d in dirs:
+		var dest := enemy.grid_cell + d
+		if not _can_enemy_step(dest, enemy):
+			continue
+		var trap := _trap_at(dest)
+		if trap != null:
+			# Running away: don't intentionally step into traps
+			continue
+		var dist: int = abs(dest.x - player_cell.x) + abs(dest.y - player_cell.y)
+		if dist > best_dist:
+			best_dist = dist
+			best = [dest]
+		elif dist == best_dist:
+			best.append(dest)
+	if best.is_empty():
+		_move_homing_enemy(enemy)
+		return
+	var pick := best[_rng.randi_range(0, best.size() - 1)]
+	_set_enemy_cell(enemy, pick)
+
+func _imp_targeting_data(origin: Vector2i, target: Vector2i) -> Dictionary:
+	var dx := target.x - origin.x
+	var dy := target.y - origin.y
+	var dist: int = max(abs(dx), abs(dy))
+	if dist < 1 or dist > 4:
+		return {}
+	var dir := Vector2i(sign(dx), sign(dy))
+	var aligned: bool = (dx == 0 or dy == 0 or abs(dx) == abs(dy))
+	if not aligned or dir == Vector2i.ZERO:
+		return {}
+	return {"dir": dir, "dist": dist}
+
+func _imp_line_clear(origin: Vector2i, dir: Vector2i, dist: int) -> bool:
+	for i in range(1, dist + 1):
+		var cell := origin + dir * i
+		if not _in_interior(cell):
+			return false
+		if _is_wall(cell):
+			return false
+		if i < dist:
+			if _get_enemy_at(cell) != null:
+				return false
+			if _trap_at(cell) != null:
+				return false
+	return true
+
+func _imp_miss_chance(dist: int) -> float:
+	return clampf(0.15 * float(max(0, dist - 1)), 0.0, 0.6)
+
+func _imp_fire_shot(imp: Imp, dir: Vector2i, dist: int, player_cell: Vector2i) -> void:
+	if imp == null or not imp.alive:
+		return
+	var origin := imp.grid_cell
+	var end_cell := origin + dir * dist
+	_fire_projectile(origin, end_cell, Color(0.9, 0.2, 0.2, 1))
+	imp.arrows = max(0, imp.arrows - 1)
+	imp.cooldown = 2
+	if _rng.randf() < _imp_miss_chance(dist):
+		_log_action("That was close!")
+		return
+	_apply_player_damage(1)
+	_log_action("Imp hits you!")
+
+func _imp_take_turn(imp: Imp) -> void:
+	if imp == null or not imp.alive:
+		return
+	imp.cooldown = max(0, imp.cooldown - 1)
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var targeting := _imp_targeting_data(imp.grid_cell, player_cell)
+	if imp.arrows > 0 and imp.cooldown == 0 and not targeting.is_empty():
+		var dir: Vector2i = targeting["dir"]
+		var dist: int = targeting["dist"]
+		if _imp_line_clear(imp.grid_cell, dir, dist):
+			_imp_fire_shot(imp, dir, dist, player_cell)
+			return
+	if imp.arrows <= 0:
+		_move_enemy_away_from_player(imp)
+	else:
+		_move_homing_enemy(imp)
 
 func _get_grid_size() -> Vector2i:
 	# Use a fixed world size (in tiles)
@@ -955,6 +1227,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)
 	var is_free := Callable(self, "_is_free")
 	var has_free_neighbor := Callable(self, "_has_free_neighbor")
+	_enforce_melee_first_level_only()
 	_clear_enemies()
 	_clear_mice()
 	_clear_runes()
@@ -1079,6 +1352,20 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_potion2_collected = true
 		if _potion2_node:
 			_potion2_node.visible = false
+	# Place cheese (max once per run)
+	if _cheese_level == _level and not _cheese_collected and not _cheese_given:
+		if _cheese_node == null:
+			_cheese_node = _make_item_node("Cheese", CHEESE_TEX)
+			add_child(_cheese_node)
+		var cheese_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _potion2_cell, _wand_cell, _bow_cell]
+		_cheese_cell = _level_builder.pick_free_interior_cell(grid_size, cheese_exclude, is_free, has_free_neighbor)
+		_cheese_node.place(_cheese_cell)
+		_normalize_item_node(_cheese_node, CHEESE_TEX)
+		_cheese_node.visible = true
+	else:
+		_cheese_cell = Vector2i(-1, -1)
+		if _cheese_node:
+			_cheese_node.visible = false
 	# Place arrows (planned: max 1 per level, min 1/max 3 per game)
 	_arrow_cells.clear()
 	var arrow_pickups := int(_arrow_plan.get(_level, 0))
@@ -1089,6 +1376,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			arrow_exclude.append(_potion_cell)
 		if _potion2_cell != Vector2i(-1, -1):
 			arrow_exclude.append(_potion2_cell)
+		if _cheese_cell != Vector2i(-1, -1):
+			arrow_exclude.append(_cheese_cell)
 		for i_a in range(arrow_pickups):
 			var acell := _level_builder.pick_free_interior_cell(grid_size, arrow_exclude, is_free, has_free_neighbor)
 			arrow_exclude.append(acell)
@@ -1119,6 +1408,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			b_exclude.append(_potion_cell)
 		if _potion2_cell != Vector2i(-1, -1):
 			b_exclude.append(_potion2_cell)
+		if _cheese_cell != Vector2i(-1, -1):
+			b_exclude.append(_cheese_cell)
 		for ac in _arrow_cells:
 			b_exclude.append(ac)
 		for i_b in range(brazier_count):
@@ -1171,6 +1462,10 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		base_exclude.append(_potion_cell)
 	if _potion2_cell != Vector2i(-1, -1):
 		base_exclude.append(_potion2_cell)
+	base_exclude.append_array(_rune1_cells)
+	base_exclude.append_array(_rune2_cells)
+	base_exclude.append_array(_rune3_cells)
+	base_exclude.append_array(_rune4_cells)
 	for ac3 in _arrow_cells:
 		base_exclude.append(ac3)
 	if _brazier_cells.size() > 0:
@@ -1183,6 +1478,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	var rune1_to_place: int = int(_rune1_plan.get(_level, 0))
 	var rune2_to_place: int = int(_rune2_plan.get(_level, 0))
 	var rune3_to_place: int = int(_rune3_plan.get(_level, 0))
+	var rune4_to_place: int = int(_rune4_plan.get(_level, 0))
 	for i_a in range(armor_to_place):
 		var a_cell := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
 		base_exclude.append(a_cell)
@@ -1215,6 +1511,14 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		add_child(node3)
 		node3.place(cell3)
 		_rune3_nodes.append(node3)
+	for i_r4 in range(rune4_to_place):
+		var cell4 := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
+		base_exclude.append(cell4)
+		_rune4_cells.append(cell4)
+		var node4: Item = _make_item_node("Rune4%d" % i_r4, RUNE4_TEX)
+		add_child(node4)
+		node4.place(cell4)
+		_rune4_nodes.append(node4)
 	# Torch placement: only once per run
 	if not _torch_collected and _level == _torch_target_level:
 		var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell]
@@ -1232,6 +1536,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			exclude2.append(a_cell)
 		for c3 in _rune3_cells:
 			exclude2.append(c3)
+		for c4 in _rune4_cells:
+			exclude2.append(c4)
 		if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
 			exclude2.append(_ring_cell)
 		if _codex_cell != Vector2i.ZERO:
@@ -1297,6 +1603,13 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		m_exclude.append_array(zcells)
 		var mcell := _level_builder.pick_free_interior_cell(grid_size, m_exclude, is_free, has_free_neighbor)
 		_spawn_minotaur_at(mcell)
+	# Spawn imps at about the same rate as minotaurs (ranged threat)
+	var imp_count: int = mino_count
+	for i_imp in range(imp_count):
+		var i_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
+		i_exclude.append_array(zcells)
+		var icell := _level_builder.pick_free_interior_cell(grid_size, i_exclude, is_free, has_free_neighbor)
+		_spawn_imp_at(icell)
 	# Spawn 0-3 mice per level as non-hostile wanderers
 	var mice_count: int = _rng.randi_range(0, 3)
 	for i in range(mice_count):
@@ -1325,12 +1638,14 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			_potion2_cell,
 			_codex_cell,
 			_torch_cell,
-			_ring_cell
+			_ring_cell,
+			_cheese_cell
 		]
 		t_exclude.append_array(_rune1_cells)
 		t_exclude.append_array(_rune2_cells)
 		t_exclude.append_array(_armor_cells)
 		t_exclude.append_array(_rune3_cells)
+		t_exclude.append_array(_rune4_cells)
 		if not zcells.is_empty():
 			t_exclude.append(zcells[0])
 		var tcell := _level_builder.pick_free_interior_cell(grid_size, t_exclude, is_free, has_free_neighbor)
@@ -1367,10 +1682,12 @@ func _restart_game() -> void:
 	_rune1_collected_count = 0
 	_rune2_collected_count = 0
 	_rune3_collected_count = 0
+	_rune4_collected_count = 0
 	_ring_cell = Vector2i.ZERO
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_rune4_cells.clear()
 	_armor_cells.clear()
 	_wand_cell = Vector2i.ZERO
 	_bow_cell = Vector2i.ZERO
@@ -1402,10 +1719,12 @@ func _restart_game() -> void:
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_rune4_cells.clear()
 	_armor_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
 	_arrow_count = 0
+	_rune4_dash_cooldown = 0
 	_active_ranged_weapon = RANGED_NONE
 	for anode in _arrow_nodes:
 		if anode:
@@ -1413,6 +1732,7 @@ func _restart_game() -> void:
 			anode.collected = true
 	_brazier_cells.clear()
 	_clear_braziers()
+	_clear_action_log()
 	_clear_corpses()
 	_clear_enemies()
 	_clear_runes()
@@ -1482,6 +1802,44 @@ func _set_icon_visible(icon: Control, should_show: bool) -> void:
 		return
 	icon.visible = true
 	icon.modulate.a = (1.0 if should_show else 0.0)
+
+func _init_action_log_labels() -> void:
+	_hud_action_lines.clear()
+	if _action_log_box == null:
+		return
+	for child in _action_log_box.get_children():
+		if child is Label:
+			var lbl := child as Label
+			_hud_action_lines.append(lbl)
+			lbl.add_theme_font_override("font", ACTION_LOG_FONT)
+			lbl.add_theme_font_size_override("font_size", ACTION_LOG_FONT_SIZE)
+	_refresh_action_log()
+
+func _refresh_action_log() -> void:
+	if _hud_action_lines.is_empty():
+		return
+	for i in range(_hud_action_lines.size()):
+		var line: Label = _hud_action_lines[i]
+		if line == null:
+			continue
+		var text := ""
+		if i < _action_log.size():
+			text = _action_log[i]
+		line.text = text
+		var alpha: float = ACTION_LOG_OPACITIES[i] if i < ACTION_LOG_OPACITIES.size() else ACTION_LOG_OPACITIES.back()
+		line.modulate = Color(1, 1, 1, alpha if text != "" else 0.0)
+
+func _log_action(text: String) -> void:
+	if text.is_empty():
+		return
+	_action_log.insert(0, text)
+	while _action_log.size() > ACTION_LOG_MAX:
+		_action_log.pop_back()
+	_refresh_action_log()
+
+func _clear_action_log() -> void:
+	_action_log.clear()
+	_refresh_action_log()
 
 func _apply_ranged_highlight() -> void:
 	if _hud_bow_panel:
@@ -1567,6 +1925,7 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 	exclude.append_array(_rune1_cells)
 	exclude.append_array(_rune2_cells)
 	exclude.append_array(_rune3_cells)
+	exclude.append_array(_rune4_cells)
 	exclude.append_array(_armor_cells)
 	var pick_cell := func() -> Vector2i:
 		var c := _level_builder.pick_free_interior_cell(
@@ -1620,6 +1979,13 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 		n3.place(c3)
 		_rune3_cells.append(c3)
 		_rune3_nodes.append(n3)
+	if _rune4_nodes.is_empty():
+		var c4: Vector2i = pick_cell.call()
+		var n4: Item = _make_item_node("DebugRune4", RUNE4_TEX)
+		add_child(n4)
+		n4.place(c4)
+		_rune4_cells.append(c4)
+		_rune4_nodes.append(n4)
 	if _armor_nodes.is_empty():
 		var ac: Vector2i = pick_cell.call()
 		var an: Item = _make_item_node("DebugArmor", ARMOR_TEX)
@@ -1658,11 +2024,14 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 		if not enemy.alive:
 			return
 	while true:
-		var player_roll: int = _rng.randi_range(1, 20)
-		var enemy_roll: int = _rng.randi_range(1, 20)
-		player_roll += _attack_bonus()
-		enemy_roll -= _defense_bonus()
-		print("Player rolls ", player_roll, ", ", enemy.enemy_type, " rolls ", enemy_roll)
+		var p_base: int = _rng.randi_range(1, 20)
+		var e_base: int = _rng.randi_range(1, 20)
+		var p_bonus: int = _attack_bonus()
+		var e_penalty: int = _defense_bonus()
+		var player_roll: int = p_base + p_bonus
+		var enemy_roll: int = e_base - e_penalty
+		print("Player rolls ", player_roll, " (", p_base, " + ", p_bonus, "), ", enemy.enemy_type, " rolls ", enemy_roll, " (", e_base, " - ", e_penalty, ")")
+		_log_action("Roll: Player %d (%d + %d) vs %s %d (%d - %d)" % [player_roll, p_base, p_bonus, String(enemy.enemy_type), enemy_roll, e_base, e_penalty])
 		if player_roll == enemy_roll:
 			if force_outcome:
 				continue
@@ -1690,7 +2059,7 @@ func _handle_enemy_death(enemy: Enemy) -> void:
 func _enemy_score_value(enemy: Enemy) -> int:
 	if enemy == null:
 		return 0
-	if enemy.enemy_type == &"minotaur":
+	if enemy.enemy_type == &"minotaur" or enemy.enemy_type == &"imp":
 		return 2
 	return 1
 
@@ -1707,26 +2076,32 @@ func _maybe_level_up() -> void:
 
 func _apply_level_up_reward() -> void:
 	var roll := _rng.randf()
+	var log_msg := "Level up:"
 	if roll < 0.4:
 		_attack_level_bonus += 1
 		print("LEVEL UP: +1 ATK (bonus=", _attack_level_bonus, ")")
+		log_msg += " +1 ATK"
 	elif roll < 0.8:
 		_defense_level_bonus += 1
 		print("LEVEL UP: +1 DEF (bonus=", _defense_level_bonus, ")")
+		log_msg += " +1 DEF"
 	else:
 		if _hp_max < HP_MAX_LIMIT:
 			_hp_max = min(HP_MAX_LIMIT, _hp_max + 1)
 			print("LEVEL UP: +1 MAX HP (max=", _hp_max, ")")
+			log_msg += " +1 MAX HP"
 		else:
 			_attack_level_bonus += 1
 			_defense_level_bonus += 1
 			print("LEVEL UP: +1 ATK and +1 DEF (max HP already at limit)")
+			log_msg += " +1 ATK +1 DEF"
 	if _hp_current < _hp_max:
 		_hp_current = min(_hp_max, _hp_current + 1)
 	_update_hud_hearts()
 	_update_hud_icons()
 	_play_sfx(SFX_LEVEL_UP)
 	_blink_node_colored(player, Color(0.776, 0.624, 0.153))
+	_log_action(log_msg)
 
 func _leave_enemy_corpse(enemy: Enemy) -> void:
 	if _decor == null or enemy == null:
@@ -1739,6 +2114,8 @@ func _leave_enemy_corpse(enemy: Enemy) -> void:
 			corpse_tex = ZOMBIE_TEX_2
 		elif enemy.enemy_type == &"minotaur":
 			corpse_tex = MINO_TEX_2
+		elif enemy.enemy_type == &"imp":
+			corpse_tex = IMP_DEAD_TEX
 	if corpse_tex == null:
 		return
 	var s := Sprite2D.new()
@@ -1770,6 +2147,10 @@ func _apply_player_damage(amount: int) -> void:
 	_play_sfx(SFX_HURT2)
 	_blink_node(player)
 	if _hp_current <= 0:
+		if _last_death_cause == StringName():
+			_last_death_cause = &"enemy"
+		if _player_sprite and PLAYER_TEX_DEAD:
+			_player_sprite.texture = PLAYER_TEX_DEAD
 		_game_over = true
 		_won = false
 		if player.has_method("set_control_enabled"):
@@ -1873,6 +2254,9 @@ func _has_rune2() -> bool:
 func _has_rune3() -> bool:
 	return _rune3_collected_count > 0
 
+func _has_rune4() -> bool:
+	return _rune4_collected_count > 0
+
 func _attack_bonus() -> int:
 	var bonus := 0
 	if _sword_collected:
@@ -1971,6 +2355,16 @@ func _apply_restored_items() -> void:
 			_torch_node.visible = true
 		else:
 			_torch_node.visible = false
+	if _cheese_level == _level and _cheese_node == null:
+		_cheese_node = _make_item_node("Cheese", CHEESE_TEX)
+		add_child(_cheese_node)
+	if _cheese_node:
+		if _level == _cheese_level and not _cheese_collected and not _cheese_given and _cheese_cell != Vector2i(-1, -1):
+			_cheese_node.place(_cheese_cell)
+			_normalize_item_node(_cheese_node, CHEESE_TEX)
+			_cheese_node.visible = true
+		else:
+			_cheese_node.visible = false
 	if _wand_node:
 		if _level == _wand_level and not _wand_collected and _wand_cell != Vector2i(-1, -1):
 			_wand_node.place(_wand_cell)
@@ -2003,6 +2397,7 @@ func _apply_restored_items() -> void:
 		_door_node.global_position = Grid.cell_to_world(_door_cell)
 	if _entrance_door_node:
 		_entrance_door_node.global_position = Grid.cell_to_world(_entrance_cell)
+	_apply_final_door_fx()
 
 func _save_level_state(level: int) -> void:
 	var state := {}
@@ -2034,9 +2429,13 @@ func _save_level_state(level: int) -> void:
 	state["crown_collected"] = _crown_collected
 	state["torch_cell"] = _torch_cell
 	state["torch_collected"] = _torch_collected
+	state["cheese_cell"] = _cheese_cell
+	state["cheese_collected"] = _cheese_collected
+	state["cheese_given"] = _cheese_given
 	state["rune1_cells"] = []
 	state["rune2_cells"] = []
 	state["rune3_cells"] = []
+	state["rune4_cells"] = []
 	for r1 in _rune1_nodes:
 		if r1 != null and not r1.collected:
 			state["rune1_cells"].append(r1.grid_cell)
@@ -2049,6 +2448,9 @@ func _save_level_state(level: int) -> void:
 	for r3 in _rune3_nodes:
 		if r3 != null and not r3.collected:
 			state["rune3_cells"].append(r3.grid_cell)
+	for r4 in _rune4_nodes:
+		if r4 != null and not r4.collected:
+			state["rune4_cells"].append(r4.grid_cell)
 	state["exit_cell"] = _door_cell
 	state["entrance_cell"] = _entrance_cell
 	state["door_open"] = _door_is_open
@@ -2073,6 +2475,15 @@ func _save_level_state(level: int) -> void:
 			"cell": m.grid_cell,
 			"alive": m.alive,
 			"hp": m.hp
+		})
+	for imp in _imps:
+		enemies.append({
+			"type": "imp",
+			"cell": imp.grid_cell,
+			"alive": imp.alive,
+			"hp": imp.hp,
+			"arrows": imp.arrows,
+			"cooldown": imp.cooldown
 		})
 	for sk in _skeletons:
 		enemies.append({
@@ -2158,17 +2569,22 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	_crown_collected = state.get("crown_collected", _crown_collected)
 	_torch_cell = state.get("torch_cell", _torch_cell)
 	_torch_collected = state.get("torch_collected", _torch_collected)
+	_cheese_cell = state.get("cheese_cell", _cheese_cell)
+	_cheese_collected = state.get("cheese_collected", _cheese_collected)
+	_cheese_given = state.get("cheese_given", _cheese_given)
 	_door_cell = state.get("exit_cell", _door_cell)
 	_entrance_cell = state.get("entrance_cell", _entrance_cell)
 	_door_is_open = state.get("door_open", false)
 	var r1_state: Array = state.get("rune1_cells", [])
 	var r2_state: Array = state.get("rune2_cells", [])
 	var r3_state: Array = state.get("rune3_cells", [])
+	var r4_state: Array = state.get("rune4_cells", [])
 	_clear_runes()
 	_clear_armor_items()
 	_rune1_cells = []
 	_rune2_cells = []
 	_rune3_cells = []
+	_rune4_cells = []
 	_armor_cells = []
 	for a in armor_state:
 		if a is Vector2i:
@@ -2182,6 +2598,9 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	for v3 in r3_state:
 		if v3 is Vector2i:
 			_rune3_cells.append(v3)
+	for v4 in r4_state:
+		if v4 is Vector2i:
+			_rune4_cells.append(v4)
 	for rc1 in _rune1_cells:
 		var n1 := _make_item_node("Rune1Restore", RUNE1_TEX)
 		add_child(n1)
@@ -2202,6 +2621,11 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 		add_child(n3)
 		n3.place(rc3)
 		_rune3_nodes.append(n3)
+	for rc4 in _rune4_cells:
+		var n4 := _make_item_node("Rune4Restore", RUNE4_TEX)
+		add_child(n4)
+		n4.place(rc4)
+		_rune4_nodes.append(n4)
 	var spawn_cell: Vector2i = _entrance_cell
 	if not entering_forward:
 		spawn_cell = _door_cell
@@ -2244,6 +2668,16 @@ func _restore_entities_from_state(level: int) -> void:
 				_minotaurs.back().alive = false
 				_minotaurs.back().visible = false
 				_remove_enemy_from_map(_minotaurs.back())
+		elif etype == "imp":
+			var icell := cell
+			_spawn_imp_at(icell)
+			_imps.back().hp = e.get("hp", _imps.back().hp)
+			_imps.back().arrows = e.get("arrows", _imps.back().arrows)
+			_imps.back().cooldown = e.get("cooldown", _imps.back().cooldown)
+			if not alive:
+				_imps.back().alive = false
+				_imps.back().visible = false
+				_remove_enemy_from_map(_imps.back())
 		elif etype == "skeleton":
 			var skcell := cell
 			_spawn_skeleton_at(skcell)
@@ -2322,6 +2756,8 @@ func _start_game() -> void:
 	_wand_collected = false
 	_bow_collected = false
 	_torch_collected = false
+	_cheese_collected = false
+	_cheese_given = false
 	_ring_collected = false
 	_codex_collected = false
 	_crown_collected = false
@@ -2330,6 +2766,7 @@ func _start_game() -> void:
 	_rune2_collected_count = 0
 	_rune3_collected_count = 0
 	_ring_cell = Vector2i.ZERO
+	_cheese_cell = Vector2i.ZERO
 	_wand_cell = Vector2i.ZERO
 	_bow_cell = Vector2i.ZERO
 	_arrow_cells.clear()
@@ -2357,6 +2794,7 @@ func _start_game() -> void:
 	_brazier_cells.clear()
 	_clear_braziers()
 	_clear_debug_items()
+	_clear_action_log()
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
@@ -2400,24 +2838,65 @@ func _show_title(visible: bool) -> void:
 	_over_layer.visible = false
 	_hide_loading()
 	if visible and _title_bg and not _title_textures.is_empty():
-		var pick := _rng.randi_range(0, _title_textures.size() - 1)
-		var tex: Texture2D = _title_textures[pick]
+		var tex: Texture2D = _random_texture(_title_textures)
 		if tex:
 			_title_bg.texture = tex
 	_title_label.add_theme_font_size_override("font_size", 64)
 	_title_label.offset_top = get_viewport_rect().size.y * 0.5
 
 func _show_game_over(won: bool) -> void:
-	_over_layer.visible = true
-	_over_bg_win.visible = won
-	_over_bg_lose.visible = not won
-	_hide_loading()
-	_over_label.add_theme_font_size_override("font_size", 48)
-	_over_label.text = "Press Enter to restart"
+	var cause_text := _death_cause_text()
+	var viewport_size := get_viewport_rect().size
+	if _over_bg_win:
+		_over_bg_win.visible = won
+	if _over_bg_lose:
+		_over_bg_lose.visible = not won
+	if _over_layer:
+		_over_layer.visible = true
+	var tex_arr := _win_textures if won else _lose_textures
+	var target_rect := _over_bg_win if won else _over_bg_lose
+	if target_rect and not tex_arr.is_empty():
+		var tex := _random_texture(tex_arr)
+		if tex:
+			target_rect.texture = tex
+	if _over_result:
+		_over_result.visible = true
+		_over_result.text = "Thou hast Triumphed!" if won else "Thou hast Perished!"
+		_over_result.add_theme_font_size_override("font_size", 64)
+		_over_result.modulate.a = 0.0
+	if _over_label:
+		_over_label.visible = true
+		_over_label.add_theme_font_size_override("font_size", 96)
+		_over_label.text = "Press Enter to restart"
+		_over_label.modulate.a = 0.0
 	if _over_score:
-		_over_score.add_theme_font_size_override("font_size", 36)
-		_over_score.offset_top = -get_viewport_rect().size.y * 0.12
+		_over_score.add_theme_font_size_override("font_size", 80)
 		_over_score.text = "EXP: %d" % _score
+		_over_score.modulate.a = 0.0
+	if _over_cause:
+		_over_cause.visible = not won
+		_over_cause.add_theme_font_size_override("font_size", 80)
+		_over_cause.text = cause_text
+		_over_cause.modulate.a = 0.0
+	if _over_bg_win and won:
+		_over_bg_win.modulate.a = 0.0
+	if _over_bg_lose and not won:
+		_over_bg_lose.modulate.a = 0.0
+	_position_game_over_labels(viewport_size)
+	_hide_loading()
+	await _fade_to(level_fade_alpha, level_fade_out_time)
+	var tw := get_tree().create_tween()
+	tw.set_parallel(true)
+	if _fade:
+		tw.tween_property(_fade, "modulate:a", 0.0, level_fade_out_time)
+	if _over_bg_win and won:
+		tw.tween_property(_over_bg_win, "modulate:a", 1.0, level_fade_out_time)
+	if _over_bg_lose and not won:
+		tw.tween_property(_over_bg_lose, "modulate:a", 1.0, level_fade_out_time)
+	for node in [_over_result, _over_label, _over_score, _over_cause]:
+		if node and node.visible:
+			tw.tween_property(node, "modulate:a", 1.0, level_fade_out_time)
+	await tw.finished
 	_update_title_build_label()
 
 func _on_viewport_resized() -> void:
@@ -2431,9 +2910,55 @@ func _resize_fullscreen_art() -> void:
 			rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 			rect.expand = true
 	_title_label.offset_top = viewport_size.y * 0.5
-	if _over_score:
-		_over_score.offset_top = -viewport_size.y * 0.12
+	_position_game_over_labels(viewport_size)
 	_update_title_build_label()
+
+func _death_cause_text() -> String:
+	if _last_death_cause == &"trap":
+		return "Died of tetanus on Floor %d" % _level
+	if _last_death_cause == StringName() or _enemy_map.is_empty():
+		return "Defeated at the hands of a monster on Floor %d" % _level
+	for e in _enemy_map.values():
+		if e is Enemy and e.alive:
+			return "Defeated at the hands of a %s on Floor %d" % [String(e.enemy_type), _level]
+	if _last_death_cause != StringName():
+		return "Defeated at the hands of a %s on Floor %d" % [String(_last_death_cause), _level]
+	return "Defeated at the hands of a monster on Floor %d" % _level
+
+func _random_texture(options: Array[Texture2D]) -> Texture2D:
+	if options.is_empty():
+		return null
+	var available: Array[Texture2D] = []
+	for tex in options:
+		if tex != null:
+			available.append(tex)
+	if available.is_empty():
+		return null
+	var pick := _rng.randi_range(0, available.size() - 1)
+	return available[pick]
+
+func _position_game_over_labels(viewport_size: Vector2) -> void:
+	# Place result near top, then score, then restart prompt.
+	var result_y := viewport_size.y * 0.22
+	var cause_y := viewport_size.y * 0.33
+	var score_y := viewport_size.y * 0.42
+	var prompt_y := viewport_size.y * 0.52
+	var result_h := 80.0
+	var cause_h := 60.0
+	var score_h := 60.0
+	var prompt_h := 60.0
+	if _over_result:
+		_over_result.offset_top = result_y
+		_over_result.offset_bottom = result_y + result_h - viewport_size.y
+	if _over_cause:
+		_over_cause.offset_top = cause_y
+		_over_cause.offset_bottom = cause_y + cause_h - viewport_size.y
+	if _over_score:
+		_over_score.offset_top = score_y
+		_over_score.offset_bottom = score_y + score_h - viewport_size.y
+	if _over_label:
+		_over_label.offset_top = prompt_y
+		_over_label.offset_bottom = prompt_y + prompt_h - viewport_size.y
 
 func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible
@@ -2444,13 +2969,15 @@ func _set_world_visible(visible: bool) -> void:
 	if _key_node:
 		_key_node.visible = visible and _key_on_level and not _key_collected
 	if _sword_node:
-		_sword_node.visible = visible and not _sword_collected
+		_sword_node.visible = visible and not _sword_collected and _level == 1
 	if _shield_node:
-		_shield_node.visible = visible and not _shield_collected
+		_shield_node.visible = visible and not _shield_collected and _level == 1
 	if _potion_node:
 		_potion_node.visible = visible and not _potion_collected
 	if _potion2_node:
 		_potion2_node.visible = visible and _level >= 2 and not _potion2_collected
+	if _cheese_node:
+		_cheese_node.visible = visible and not _cheese_collected and not _cheese_given and _level == _cheese_level
 	if _torch_node:
 		_torch_node.visible = visible and not _torch_collected and _level == _torch_target_level
 	if _ring_node:
@@ -2490,6 +3017,8 @@ func _set_world_visible(visible: bool) -> void:
 		m.visible = visible and m.alive
 	for sk in _skeletons:
 		sk.visible = visible and sk.alive
+	for imp in _imps:
+		imp.visible = visible and imp.alive
 	for t in _traps:
 		t.visible = visible
 	for mouse in _mice:
@@ -2502,7 +3031,32 @@ func _set_world_visible(visible: bool) -> void:
 		_door_node.visible = visible
 	if _entrance_door_node:
 		_entrance_door_node.visible = visible and _level > 1
+	_apply_final_door_fx()
 	_update_hud_icons()
+
+func _try_give_cheese(cell: Vector2i) -> void:
+	if not _cheese_collected or _cheese_given:
+		return
+	var mouse := _mouse_at(cell)
+	if mouse == null:
+		return
+	_cheese_given = true
+	_cheese_collected = false
+	_attack_level_bonus += 1
+	_defense_level_bonus += 1
+	_play_sfx(SFX_PICKUP1)
+	_update_hud_icons()
+	_log_action("The mouse says \"Thank you!\" ( +1 ATK, +1 DEF)")
+
+func _enforce_melee_first_level_only() -> void:
+	if _level == 1:
+		return
+	_sword_cell = Vector2i(-1, -1)
+	_shield_cell = Vector2i(-1, -1)
+	if _sword_node:
+		_sword_node.visible = false
+	if _shield_node:
+		_shield_node.visible = false
 
 func _ensure_fov_overlay() -> void:
 	if _fov_overlay == null:
@@ -2616,6 +3170,13 @@ func _spawn_minotaur_at(cell: Vector2i) -> void:
 	_register_enemy(node)
 	_minotaurs.append(node)
 
+func _spawn_imp_at(cell: Vector2i) -> void:
+	var node: Imp = IMP_SCENE.instantiate() as Imp
+	node.setup(cell, IMP_TEX, IMP_DEAD_TEX)
+	add_child(node)
+	_register_enemy(node)
+	_imps.append(node)
+
 func _spawn_mouse_at(cell: Vector2i) -> void:
 	var node: Mouse = MOUSE_SCENE.instantiate() as Mouse
 	var tex: Texture2D = _sheet_tex_cache.get(&"mouse_tex", null)
@@ -2644,6 +3205,7 @@ func _spawn_skeleton_at(cell: Vector2i) -> void:
 	add_child(node)
 	_register_enemy(node)
 	_skeletons.append(node)
+	_log_action("AHHHHH!!!!")
 
 func _clear_enemies() -> void:
 	for child: Goblin in _goblins:
@@ -2652,11 +3214,14 @@ func _clear_enemies() -> void:
 		child.queue_free()
 	for child: Minotaur in _minotaurs:
 		child.queue_free()
+	for child: Imp in _imps:
+		child.queue_free()
 	for child: Skeleton in _skeletons:
 		child.queue_free()
 	_goblins.clear()
 	_zombies.clear()
 	_minotaurs.clear()
+	_imps.clear()
 	_skeletons.clear()
 	_enemy_map.clear()
 	_clear_mice()
@@ -2700,12 +3265,16 @@ func _clear_runes() -> void:
 		r.queue_free()
 	for r in _rune3_nodes:
 		r.queue_free()
+	for r in _rune4_nodes:
+		r.queue_free()
 	_rune1_nodes.clear()
 	_rune2_nodes.clear()
 	_rune3_nodes.clear()
+	_rune4_nodes.clear()
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_rune4_cells.clear()
 
 func _reset_items_visibility() -> void:
 	var key_type := _current_key_type()
@@ -2724,6 +3293,9 @@ func _reset_items_visibility() -> void:
 	if _potion2_node:
 		_potion2_node.collected = _potion2_collected
 		_potion2_node.visible = not _potion2_collected and _potion2_cell != Vector2i(-1, -1)
+	if _cheese_node:
+		_cheese_node.collected = _cheese_collected
+		_cheese_node.visible = (_level == _cheese_level) and not _cheese_collected and not _cheese_given and _cheese_cell != Vector2i(-1, -1)
 	if _codex_node:
 		var st := _current_level_special_type()
 		var needs_special := st == &"codex" or st == &"crown"
@@ -2761,6 +3333,10 @@ func _reset_items_visibility() -> void:
 		if r3:
 			r3.collected = r3.collected
 			r3.visible = not r3.collected
+	for r4 in _rune4_nodes:
+		if r4:
+			r4.collected = r4.collected
+			r4.visible = not r4.collected
 	if _ring_node:
 		_ring_node.collected = _ring_collected
 		_ring_node.visible = _current_level_special_type() == &"ring" and not _ring_collected
@@ -2799,7 +3375,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if not _is_free(c):
 				continue
-			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c) or _debug_cell_blocked(c):
+			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _rune4_cells.has(c) or _armor_cells.has(c) or _debug_cell_blocked(c):
 				continue
 			if _get_enemy_at(c) != null:
 				continue
@@ -2874,7 +3450,7 @@ func _place_spiderwebs(grid_size: Vector2i) -> void:
 					continue
 				if not _is_free(c):
 					continue
-				if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _potion2_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c):
+				if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _potion2_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _rune4_cells.has(c) or _armor_cells.has(c):
 					continue
 				if _bone_cells.has(c):
 					continue
@@ -2981,6 +3557,7 @@ func _place_door(grid_size: Vector2i) -> void:
 		_door_cell = Vector2i(0, 0)
 	if _door_node:
 		_door_node.global_position = Grid.cell_to_world(_door_cell)
+	_apply_final_door_fx()
 	_update_door_texture()
 
 func _place_entrance_door(grid_size: Vector2i) -> void:
@@ -3008,7 +3585,40 @@ func _update_door_texture() -> void:
 	_door_is_open = open
 	if _entrance_door_sprite:
 		_entrance_door_sprite.texture = DOOR_TEX_3 if DOOR_TEX_3 != null else DOOR_TEX_2
+	_apply_final_door_fx()
 	print("[DEBUG] Door texture update: level=", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " open=", open, " door_cell=", _door_cell)
+
+func _stop_final_door_fx() -> void:
+	if _door_pulse_tween:
+		_door_pulse_tween.kill()
+		_door_pulse_tween = null
+	if _door_sprite:
+		_door_sprite.scale = Vector2.ONE
+	if _door_glow:
+		_door_glow.visible = false
+
+func _apply_final_door_fx() -> void:
+	if _door_sprite == null or _door_node == null:
+		return
+	var is_final := (_level >= _max_level)
+	if not is_final:
+		_stop_final_door_fx()
+		return
+	if _door_glow == null:
+		_door_glow = PointLight2D.new()
+		_door_glow.energy = 0.9
+		_door_glow.texture_scale = 0.35
+		_door_glow.color = Color(1, 0.85, 0.3, 0.8)
+		_door_glow.shadow_enabled = false
+		_door_node.add_child(_door_glow)
+		_door_glow.position = Vector2(6, 6)
+	_door_glow.visible = true
+	_stop_final_door_fx()
+	_door_pulse_tween = get_tree().create_tween()
+	_door_pulse_tween.set_loops()
+	var up_scale := Vector2(1.0 + FINAL_DOOR_PULSE_SCALE, 1.0 + FINAL_DOOR_PULSE_SCALE)
+	_door_pulse_tween.tween_property(_door_sprite, "scale", up_scale, FINAL_DOOR_PULSE_TIME).set_ease(Tween.EASE_IN_OUT)
+	_door_pulse_tween.tween_property(_door_sprite, "scale", Vector2.ONE, FINAL_DOOR_PULSE_TIME).set_ease(Tween.EASE_IN_OUT)
 
 func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	if _is_transitioning:
@@ -3039,6 +3649,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_ensure_fov_overlay()
 	if _level_states.has(_level):
 		_restore_level_state(_level, entering_forward)
+		_enforce_melee_first_level_only()
 		_apply_restored_items()
 		_restore_entities_from_state(_level)
 	else:
@@ -3068,6 +3679,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_update_hud_armor()
 	if _hud_level:
 		_hud_level.text = "FLR: %d" % _level
+	_log_action("Traveled to Floor %d" % _level)
 	_update_fov()
 	_set_world_visible(true)
 	print("[DEBUG] Travel complete -> level ", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " door_cell=", _door_cell, " entrance_cell=", _entrance_cell)
@@ -3086,14 +3698,26 @@ func _update_player_sprite_appearance() -> void:
 		return
 	_player_sprite.z_index = 5
 	var both := _sword_collected and _shield_collected
+	var tex: Texture2D = null
 	if both:
-		_player_sprite.texture = PLAYER_TEX_4
+		tex = PLAYER_TEX_4
 	elif _sword_collected:
-		_player_sprite.texture = PLAYER_TEX_3
+		tex = PLAYER_TEX_3
 	elif _shield_collected:
-		_player_sprite.texture = PLAYER_TEX_2
+		tex = PLAYER_TEX_2
+	elif _active_ranged_weapon == RANGED_WAND and _wand_collected and PLAYER_TEX_WAND:
+		tex = PLAYER_TEX_WAND
+	elif _active_ranged_weapon == RANGED_BOW and _bow_collected and PLAYER_TEX_BOW:
+		tex = PLAYER_TEX_BOW
+	elif _wand_collected and PLAYER_TEX_WAND:
+		tex = PLAYER_TEX_WAND
+	elif _bow_collected and PLAYER_TEX_BOW:
+		tex = PLAYER_TEX_BOW
+	elif _torch_collected and PLAYER_TEX_TORCH:
+		tex = PLAYER_TEX_TORCH
 	else:
-		_player_sprite.texture = PLAYER_TEX_1
+		tex = PLAYER_TEX_1
+	_player_sprite.texture = tex
 
 func _update_hud_icons() -> void:
 	# Icons appear only during gameplay and when items collected
@@ -3103,6 +3727,8 @@ func _update_hud_icons() -> void:
 		_hud_level.text = "FLR: %d" % _level
 	if _hud_hearts:
 		_hud_hearts.visible = show
+	if _action_log_box:
+		_action_log_box.visible = show
 	if _hud_icon_key1 and KEY_TEX_1:
 		_hud_icon_key1.texture = KEY_TEX_1
 	if _hud_icon_key2 and KEY_TEX_2:
@@ -3120,6 +3746,8 @@ func _update_hud_icons() -> void:
 	_set_icon_visible(_hud_icon_rune1, show and _has_rune1())
 	_set_icon_visible(_hud_icon_rune2, show and _has_rune2())
 	_set_icon_visible(_hud_icon_rune3, show and _has_rune3())
+	var show_rune4 := show and _has_rune4()
+	_set_icon_visible(_hud_icon_rune4, show_rune4)
 	_set_icon_visible(_hud_icon_torch, show and _torch_collected)
 	if _hud_icon_ring and RING_TEX:
 		_hud_icon_ring.texture = RING_TEX
@@ -3127,6 +3755,9 @@ func _update_hud_icons() -> void:
 	if _hud_icon_potion and POTION_TEX:
 		_hud_icon_potion.texture = POTION_TEX
 	_set_icon_visible(_hud_icon_potion, show and _carried_potion)
+	if _hud_icon_cheese and CHEESE_TEX:
+		_hud_icon_cheese.texture = CHEESE_TEX
+	_set_icon_visible(_hud_icon_cheese, show and _cheese_collected and not _cheese_given)
 	if _hud_atk_label:
 		_hud_atk_label.visible = show
 		_hud_atk_label.text = "ATK: %d" % _attack_bonus()
@@ -3152,6 +3783,14 @@ func _update_hud_icons() -> void:
 		if _active_ranged_weapon != RANGED_WAND:
 			wand_mod = Color(0.8, 0.8, 0.8, 1)
 		_hud_icon_wand.modulate = wand_mod
+	if _hud_icon_rune4 and RUNE4_TEX:
+		_hud_icon_rune4.texture = RUNE4_TEX
+		var rune4_mod := Color(1, 1, 1, 1)
+		if _rune4_dash_cooldown > 0:
+			rune4_mod = Color(0.7, 0.7, 0.7, 1)
+		if not show_rune4:
+			rune4_mod.a = 0.0
+		_hud_icon_rune4.modulate = rune4_mod
 	if _hud_icon_bow:
 		_hud_icon_bow.modulate = bow_mod
 	_set_icon_visible(_hud_icon_bow, show and _bow_collected)
@@ -3181,6 +3820,7 @@ func _pickup_potion_if_available(cell: Vector2i) -> void:
 		_play_sfx(SFX_PICKUP1)
 		_blink_node(player)
 		_update_hud_icons()
+		_log_action("Picked up Potion")
 
 func _pickup_arrows_if_available(cell: Vector2i) -> void:
 	var gained := 0
@@ -3196,6 +3836,7 @@ func _pickup_arrows_if_available(cell: Vector2i) -> void:
 		_play_sfx(SFX_PICKUP1)
 		_blink_node(player)
 		_update_hud_icons()
+		_log_action("Picked up Arrows (+%d)" % gained)
 
 func _try_use_potion() -> void:
 	if not _carried_potion:
@@ -3208,6 +3849,7 @@ func _try_use_potion() -> void:
 	_update_hud_icons()
 	_play_sfx(SFX_PICKUP1)
 	_blink_node(player)
+	_log_action("Healed 1 HP")
 
 func _ranged_dir_from_input() -> Vector2i:
 	# Allow combining held cardinals (e.g., J+I) to produce diagonals
@@ -3271,6 +3913,7 @@ func _cycle_ranged_weapon() -> void:
 	else:
 		_active_ranged_weapon = available[(idx + 1) % available.size()]
 	_update_hud_icons()
+	_update_player_sprite_appearance()
 
 func _fire_ranged(dir: Vector2i) -> bool:
 	if dir == Vector2i.ZERO or _state != STATE_PLAYING or _is_transitioning:
@@ -3308,6 +3951,7 @@ func _cast_wand(dir: Vector2i) -> void:
 	var origin := Grid.world_to_cell(player.global_position)
 	var hit := false
 	_play_sfx(SFX_WAND)
+	_log_action("ZAP!")
 	_flash_cone(dir, origin, 3, Color(0.6, 0.3, 0.8, 0.55))
 	for offset in _cone_cells(dir, 3):
 		var target := origin + offset
@@ -3354,6 +3998,7 @@ func _shoot_bow(dir: Vector2i) -> bool:
 		if enemy != null:
 			path_end = target
 			if _bow_missed(origin, target):
+				_log_action("Whiff!")
 				break
 			_play_sfx(SFX_HURT1)
 			_blink_node(enemy)
@@ -3361,6 +4006,7 @@ func _shoot_bow(dir: Vector2i) -> bool:
 			if not enemy.alive:
 				_handle_enemy_death(enemy)
 				_check_win()
+			_log_action("Gotcha!")
 			break
 		var trap := _trap_at(target)
 		if trap != null:
@@ -3378,6 +4024,36 @@ func _bow_missed(origin: Vector2i, target: Vector2i) -> bool:
 		return false
 	var miss_chance: float = clampf((dist - 1) * 0.05, 0.0, 0.25)
 	return _rng.randf() < miss_chance
+
+func _show_dash_trail(cells: Array[Vector2i]) -> void:
+	if cells.size() < 2 or _decor == null:
+		return
+	var line: Line2D = null
+	if not _dash_trail_pool.is_empty():
+		line = _dash_trail_pool.pop_back()
+	if line == null:
+		line = Line2D.new()
+		line.width = 3
+		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.z_index = 40
+		line.z_as_relative = false
+		_decor.add_child(line)
+	line.clear_points()
+	for cell in cells:
+		var pos := Grid.cell_to_world(cell) + Vector2(Grid.CELL_SIZE / 2, Grid.CELL_SIZE / 2)
+		line.add_point(pos)
+	line.default_color = Color(1, 0.8, 0.4, 0.45)
+	line.visible = true
+	_dash_trail_active.append(line)
+	var tw := get_tree().create_tween()
+	tw.tween_property(line, "modulate:a", 0.0, 0.18)
+	tw.finished.connect(func():
+		line.visible = false
+		line.modulate.a = 1.0
+		_dash_trail_active.erase(line)
+		_dash_trail_pool.append(line)
+	)
 
 func _fire_projectile(origin: Vector2i, end_cell: Vector2i, color: Color) -> void:
 	var line: Line2D = null
@@ -3439,6 +4115,7 @@ func _apply_trap_damage() -> void:
 	if _game_over:
 		return
 	_apply_player_damage(1)
+	_last_death_cause = &"trap"
 
 func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 	if trap == null:
@@ -3448,16 +4125,23 @@ func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 		_traps.erase(trap)
 		trap.queue_free()
 		_last_trap_cell = Vector2i(-1, -1)
+		_log_action("Stuck in a spider web")
 		return
 	_apply_trap_damage()
 	_last_trap_cell = cell
+	_log_action("Ouch!")
 
 func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 	if enemy == null or not enemy.alive:
 		return
 	if trap.trap_type == &"spiderweb":
+		enemy.web_stuck_turns = max(enemy.web_stuck_turns, _rng.randi_range(2, 5))
+		_log_action("%s got stuck in a spider web" % String(enemy.enemy_type).capitalize())
+		_traps.erase(trap)
+		trap.queue_free()
 		return
 	enemy.apply_damage(1)
+	_log_action("%s stepped on a spike trap" % String(enemy.enemy_type).capitalize())
 	if not enemy.alive:
 		enemy.visible = false
 		_remove_enemy_from_map(enemy)
@@ -3512,7 +4196,8 @@ func _play_sfx(stream: AudioStream) -> void:
 	if player == null:
 		return
 	player.stream = stream
-	player.play()
+	if player.is_inside_tree():
+		player.play()
 
 func _get_audio_player() -> AudioStreamPlayer:
 	for p in _audio_pool:
@@ -3547,6 +4232,8 @@ func _set_level_item_textures() -> void:
 		(_potion_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	if _potion2_node and _potion2_node.get_node_or_null("Sprite2D") is Sprite2D:
 		(_potion2_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _cheese_node and _cheese_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_cheese_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	if _wand_node and _wand_node.get_node_or_null("Sprite2D") is Sprite2D:
 		var w_s := _wand_node.get_node("Sprite2D") as Sprite2D
 		w_s.texture = WAND_TEX if WAND_TEX != null else w_s.texture
@@ -3580,6 +4267,8 @@ func _set_level_item_textures() -> void:
 		_hud_icon_rune2.texture = RUNE2_TEX
 	if _hud_icon_rune3 and RUNE3_TEX:
 		_hud_icon_rune3.texture = RUNE3_TEX
+	if _hud_icon_rune4 and RUNE4_TEX:
+		_hud_icon_rune4.texture = RUNE4_TEX
 	if _hud_icon_torch and TORCH_TEX:
 		_hud_icon_torch.texture = TORCH_TEX
 	if _hud_icon_ring and RING_TEX:
@@ -3715,6 +4404,7 @@ func _setup_input() -> void:
 		["start", [Key.KEY_ENTER]],
 		["use_potion", [Key.KEY_Q]],
 		["switch_ranged", [Key.KEY_R]],
+		["dash_attack", [Key.KEY_E]],
 		["ranged_dir_up", [Key.KEY_KP_8, Key.KEY_I]],
 		["ranged_dir_down", [Key.KEY_KP_2, Key.KEY_K]],
 		["ranged_dir_left", [Key.KEY_KP_4, Key.KEY_J]],
@@ -3744,12 +4434,24 @@ func _prepare_run_layout() -> void:
 	_rune1_plan.clear()
 	_rune2_plan.clear()
 	_rune3_plan.clear()
+	_rune4_plan.clear()
 	_arrow_plan.clear()
 	_tileset_plan.clear()
+	_cheese_level = -1
+	_cheese_given = false
+	_cheese_collected = false
 	var levels: Array[int] = []
 	for i in range(1, _max_level + 1):
 		levels.append(i)
 	levels.shuffle()
+	var _pick_weighted_early_level := func() -> int:
+		var pool: Array[int] = []
+		for lvl in range(1, _max_level + 1):
+			pool.append(lvl)
+			if lvl <= 3 and _max_level > 1:
+				for _i in range(EARLY_LEVEL_WEIGHT - 1):
+					pool.append(lvl)
+		return pool[_rng.randi_range(0, pool.size() - 1)]
 	var specials: Array[StringName] = [&"codex", &"crown", &"ring"]
 	for s in specials:
 		if levels.is_empty():
@@ -3771,6 +4473,7 @@ func _prepare_run_layout() -> void:
 	var rune1_total: int = _rng.randi_range(1, 3)
 	var rune2_total: int = _rng.randi_range(1, 3)
 	var rune3_total: int = 1
+	var rune4_total: int = 1
 	for i_a in range(armor_total):
 		var al: int = _rng.randi_range(1, _max_level)
 		_armor_plan[al] = _armor_plan.get(al, 0) + 1
@@ -3783,18 +4486,28 @@ func _prepare_run_layout() -> void:
 	for i5 in range(rune3_total):
 		var rl3: int = _rng.randi_range(1, _max_level)
 		_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
+	for i6 in range(rune4_total):
+		var rl4: int = _rng.randi_range(1, _max_level)
+		_rune4_plan[rl4] = _rune4_plan.get(rl4, 0) + 1
 	var arrow_levels: Array[int] = []
 	for i6 in range(1, _max_level + 1):
 		arrow_levels.append(i6)
 	arrow_levels.shuffle()
 	var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
-	for _i_arrow in range(arrow_total):
-		if arrow_levels.is_empty():
-			break
-		var al: int = arrow_levels.pop_back()
+	# Guarantee at least one arrow pickup with a bias toward early floors
+	var ensured_arrow_level: int = _pick_weighted_early_level.call()
+	_arrow_plan[ensured_arrow_level] = 1
+	var remaining_arrows: int = max(0, arrow_total - 1)
+	var attempts: int = 0
+	while remaining_arrows > 0 and attempts < 100:
+		attempts += 1
+		var al: int = _pick_weighted_early_level.call()
+		if _arrow_plan.has(al):
+			continue
 		_arrow_plan[al] = 1
-	_wand_level = _rng.randi_range(1, _max_level)
-	_bow_level = _rng.randi_range(1, _max_level)
+		remaining_arrows -= 1
+	_wand_level = _pick_weighted_early_level.call()
+	_bow_level = _pick_weighted_early_level.call()
 	if DEBUG_FORCE_RANGED:
 		_wand_level = 1
 		_bow_level = 1
@@ -3805,12 +4518,18 @@ func _prepare_run_layout() -> void:
 		_rune1_plan[1] = max(1, _rune1_plan.get(1, 0))
 		_rune2_plan[1] = max(1, _rune2_plan.get(1, 0))
 		_rune3_plan[1] = max(1, _rune3_plan.get(1, 0))
+		_rune4_plan[1] = max(1, _rune4_plan.get(1, 0))
 		_arrow_plan[1] = max(1, _arrow_plan.get(1, 0))
 		_wand_level = 1
 		_bow_level = 1
 		_torch_target_level = 1
 		_level_special_map[1] = &"ring"
 		_special_levels[&"ring"] = 1
+		_cheese_level = 1
+	if DEBUG_SPAWN_CHEESE:
+		_cheese_level = 1
+	elif _rng.randf() < 0.5:
+		_cheese_level = _pick_weighted_early_level.call()
 
 func _register_enemy(enemy: Enemy) -> void:
 	if enemy == null:
@@ -3830,6 +4549,8 @@ func _remove_enemy_from_map(enemy: Enemy) -> void:
 		return
 	if _enemy_map.get(enemy.grid_cell, null) == enemy:
 		_enemy_map.erase(enemy.grid_cell)
+		if enemy.enemy_type != StringName():
+			_last_death_cause = enemy.enemy_type
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
 	var enemy: Enemy = _enemy_map.get(cell, null)

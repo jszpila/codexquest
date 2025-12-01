@@ -4,6 +4,7 @@ var _main_script: Script = preload("res://scripts/Main.gd")
 var _goblin_script: Script = preload("res://scripts/Goblin.gd")
 var _trap_script: Script = preload("res://scripts/Trap.gd")
 var _mouse_script: Script = preload("res://scripts/Mouse.gd")
+var _minotaur_script: Script = preload("res://scripts/Minotaur.gd")
 
 func _fresh_main() -> Node:
 	return _main_script.new()
@@ -126,4 +127,53 @@ func test_passability_checks_respect_walls_traps_enemies_mice() -> void:
 	trap.queue_free()
 	if main.walls_map:
 		main.walls_map.queue_free()
+	main.queue_free()
+
+func test_minotaur_tints_on_damage() -> void:
+	var mino: Node2D = _minotaur_script.new()
+	var live_tex := ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+	var corpse_tex := ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+	mino.setup(Vector2i.ZERO, live_tex, corpse_tex)
+	var sprite: Sprite2D = mino.get_node_or_null("Sprite2D") as Sprite2D
+	assert_true(sprite != null, "Minotaur should have a Sprite2D child")
+	if sprite == null:
+		mino.queue_free()
+		return
+	var original := sprite.modulate
+	# Apply damage and ensure tint changes
+	var took_damage := mino.apply_damage(1)
+	assert_true(took_damage == false, "First hit should not kill the minotaur")
+	assert_true(sprite.modulate != original, "Minotaur sprite should tint when damaged")
+	mino.queue_free()
+
+func test_final_door_fx_visibility() -> void:
+	var main: Node = _fresh_main()
+	main._door_node = Node2D.new()
+	var sprite := Sprite2D.new()
+	main._door_sprite = sprite
+	sprite.texture = ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+	main._door_node.add_child(sprite)
+	main.add_child(main._door_node)
+	main._max_level = 3
+	main._level = 2
+	main._apply_final_door_fx()
+	assert_true(main._door_glow == null or main._door_glow.visible == false, "Glow should be absent/hidden before final level")
+	main._level = main._max_level
+	main._apply_final_door_fx()
+	assert_true(main._door_glow != null and main._door_glow.visible, "Glow should be visible on final level")
+	if main._door_glow:
+		main._door_glow.queue_free()
+	main.queue_free()
+
+func test_spiderweb_trap_affects_enemies() -> void:
+	var main: Node = _fresh_main()
+	var trap: Trap = _trap_script.new()
+	trap.trap_type = &"spiderweb"
+	main._traps = [trap]
+	var goblin: Goblin = _goblin_script.new()
+	goblin.grid_cell = Vector2i(1, 1)
+	main._handle_enemy_hit_by_trap(goblin, trap)
+	assert_true(goblin.web_stuck_turns > 0, "Spiderweb should freeze enemies in place")
+	assert_true(main._traps.is_empty(), "Spiderweb trap should be consumed after triggering")
+	goblin.queue_free()
 	main.queue_free()
