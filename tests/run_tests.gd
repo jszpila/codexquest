@@ -19,11 +19,12 @@ func _run() -> void:
 	_test_melee_only_level_one_visibility()
 	_test_imp_targeting()
 	_test_imp_miss_curve()
+	_test_game_over_cause_label()
 	if not _failures.is_empty():
 		for f in _failures:
 			printerr(f)
 	else:
-		print("All tests passed (%d)" % 8)
+		print("All tests passed (%d)" % 9)
 
 func _assert_true(cond: bool, msg: String) -> void:
 	if not cond:
@@ -168,4 +169,22 @@ func _test_imp_miss_curve() -> void:
 	var far: float = main._imp_miss_chance(4)
 	_assert_true(close <= mid and mid <= far, "Imp miss chance should not decrease with distance")
 	_assert_true(far <= 0.6, "Imp miss chance should clamp at or below 60%")
+	main.queue_free()
+
+func _test_game_over_cause_label() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	main._last_death_cause = &"trap"
+	main._enemy_map = {}
+	var enemy_script: Script = load("res://scripts/Enemy.gd")
+	var enemy: Enemy = enemy_script.new()
+	enemy.enemy_type = &"imp"
+	enemy.grid_cell = Vector2i(1, 1)
+	main._enemy_map[Vector2i(1, 1)] = enemy
+	main._level = 3
+	main._score = 7
+	var cause: String = main._death_cause_text()
+	_assert_true(cause.find("tetanus") != -1, "Cause label should include trap cause")
+	_assert_true(cause.find("3") != -1, "Cause label should include floor number")
+	enemy.queue_free()
 	main.queue_free()

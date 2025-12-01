@@ -61,6 +61,7 @@ const RUNE4_DASH_COOLDOWN_MOVES := 20
 const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
 const DEBUG_SPAWN_ALL_ITEMS := false
+const RANGED_INPUT_LOCK := 0.12
 const EARLY_LEVEL_WEIGHT := 3
 const ACTION_LOG_MAX := 5
 const ACTION_LOG_OPACITIES := [1.0, 0.8, 0.6, 0.4, 0.2]
@@ -74,6 +75,7 @@ var PLAYER_TEX_4: Texture2D
 var PLAYER_TEX_WAND: Texture2D
 var PLAYER_TEX_BOW: Texture2D
 var PLAYER_TEX_TORCH: Texture2D
+var PLAYER_TEX_DEAD: Texture2D
 var HEART_TEX: Texture2D
 var GOBLIN_TEX_1: Texture2D
 var DEAD_GOBLIN_TEX: Texture2D
@@ -195,6 +197,7 @@ const ACTION_LOG_FONT := preload("res://assets/m5x7.ttf")
 @onready var _over_label: Label = $GameOver/OverLabel
 @onready var _over_result: Label = $GameOver/OverResult
 @onready var _over_score: Label = $GameOver/OverScore
+@onready var _over_cause: Label = $GameOver/OverCause
 @onready var _title_bg: TextureRect = $Title/TitleBG
 @onready var _over_bg_win: TextureRect = $GameOver/OverBGWin
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
@@ -275,6 +278,7 @@ func _load_spritesheet_textures() -> void:
 	PLAYER_TEX_WAND = _sheet_tex(&"player_wand", Vector2i(1625, 0), true)
 	PLAYER_TEX_BOW = _sheet_tex(&"player_bow", Vector2i(2028, 0), true)
 	PLAYER_TEX_TORCH = _sheet_tex(&"player_torch", Vector2i(1898, 0), true)
+	PLAYER_TEX_DEAD = _sheet_tex(&"player_dead", Vector2i(2613, 0), true)
 	HEART_TEX = _sheet_tex(&"heart", Vector2i(1014, 481), true)
 	GOBLIN_TEX_1 = _sheet_tex(&"goblin1", Vector2i(1352, 52), true)
 	DEAD_GOBLIN_TEX = _sheet_tex(&"goblin_dead", Vector2i(2613, 52), true)
@@ -545,6 +549,8 @@ var _arrow_count: int = 0
 var _active_ranged_weapon: StringName = RANGED_NONE
 var _player_level: int = 0
 var _rune4_dash_cooldown: int = 0
+var _last_death_cause: StringName = StringName()
+var _ranged_fire_lock: float = 0.0
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -615,6 +621,7 @@ func _hide_loading() -> void:
 
 func _process(_delta: float) -> void:
 	# Title state: wait for Enter to start
+	_ranged_fire_lock = max(0.0, _ranged_fire_lock - _delta)
 	if _state == STATE_TITLE:
 		if Input.is_action_just_pressed("start"):
 			_start_game()
@@ -639,8 +646,9 @@ func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("switch_ranged"):
 		_cycle_ranged_weapon()
 	var ranged_dir := _ranged_dir_from_input()
-	if ranged_dir != Vector2i.ZERO:
+	if ranged_dir != Vector2i.ZERO and _ranged_fire_lock <= 0.0:
 		if _fire_ranged(ranged_dir):
+			_ranged_fire_lock = RANGED_INPUT_LOCK
 			return
 	# proceed with gameplay checks
 	# Simple collision checks on grid
@@ -670,15 +678,15 @@ func _process(_delta: float) -> void:
 		if ktype == &"key1":
 			_key1_collected = true
 			_key1_icon_persistent = true
-			_log_action("Picked up Key 1")
+			_log_action("Picked up Gold Key")
 		elif ktype == &"key2":
 			_key2_collected = true
 			_key2_icon_persistent = true
-			_log_action("Picked up Key 2")
+			_log_action("Picked up Bronze Key")
 		elif ktype == &"key3":
 			_key3_collected = true
 			_key3_icon_persistent = true
-			_log_action("Picked up Key 3")
+			_log_action("Picked up Silver Key")
 		print("GOT KEY")
 		if _key_node:
 			_key_node.collect()
@@ -950,6 +958,7 @@ func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
 	for zombie: Zombie in _zombies:
 		if zombie.alive and _enemy_can_act(zombie):
 			_move_homing_enemy(zombie)
+			_update_facing_to_player(zombie)
 	for i in range(_skeletons.size()):
 		var skeleton := _skeletons[i]
 		if i >= skip_skeletons_from:
@@ -1048,6 +1057,15 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 	if trap2 != null:
 		_handle_enemy_hit_by_trap(enemy, trap2)
 
+func _update_facing_to_player(enemy: Enemy) -> void:
+	if enemy == null:
+		return
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var spr := enemy.get_node_or_null("Sprite2D") as Sprite2D
+	if spr == null:
+		return
+	spr.flip_h = player_cell.x > enemy.grid_cell.x
+
 func _move_enemy_away_from_player(enemy: Enemy) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)
 	var start_dist: int = abs(enemy.grid_cell.x - player_cell.x) + abs(enemy.grid_cell.y - player_cell.y)
@@ -1112,7 +1130,7 @@ func _imp_fire_shot(imp: Imp, dir: Vector2i, dist: int, player_cell: Vector2i) -
 	imp.arrows = max(0, imp.arrows - 1)
 	imp.cooldown = 2
 	if _rng.randf() < _imp_miss_chance(dist):
-		_log_action("Imp whiffs!")
+		_log_action("That was close!")
 		return
 	_apply_player_damage(1)
 	_log_action("Imp hits you!")
@@ -1966,12 +1984,14 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 		if not enemy.alive:
 			return
 	while true:
-		var player_roll: int = _rng.randi_range(1, 20)
-		var enemy_roll: int = _rng.randi_range(1, 20)
-		player_roll += _attack_bonus()
-		enemy_roll -= _defense_bonus()
-		print("Player rolls ", player_roll, ", ", enemy.enemy_type, " rolls ", enemy_roll)
-		_log_action("Roll: Player %d vs %s %d" % [player_roll, String(enemy.enemy_type), enemy_roll])
+		var p_base: int = _rng.randi_range(1, 20)
+		var e_base: int = _rng.randi_range(1, 20)
+		var p_bonus: int = _attack_bonus()
+		var e_penalty: int = _defense_bonus()
+		var player_roll: int = p_base + p_bonus
+		var enemy_roll: int = e_base - e_penalty
+		print("Player rolls ", player_roll, " (", p_base, " + ", p_bonus, "), ", enemy.enemy_type, " rolls ", enemy_roll, " (", e_base, " - ", e_penalty, ")")
+		_log_action("Roll: Player %d (%d + %d) vs %s %d (%d - %d)" % [player_roll, p_base, p_bonus, String(enemy.enemy_type), enemy_roll, e_base, e_penalty])
 		if player_roll == enemy_roll:
 			if force_outcome:
 				continue
@@ -2087,6 +2107,10 @@ func _apply_player_damage(amount: int) -> void:
 	_play_sfx(SFX_HURT2)
 	_blink_node(player)
 	if _hp_current <= 0:
+		if _last_death_cause == StringName():
+			_last_death_cause = &"enemy"
+		if _player_sprite and PLAYER_TEX_DEAD:
+			_player_sprite.texture = PLAYER_TEX_DEAD
 		_game_over = true
 		_won = false
 		if player.has_method("set_control_enabled"):
@@ -2762,28 +2786,58 @@ func _show_title(visible: bool) -> void:
 	_title_label.offset_top = get_viewport_rect().size.y * 0.5
 
 func _show_game_over(won: bool) -> void:
-	_over_layer.visible = true
-	_over_bg_win.visible = won
-	_over_bg_lose.visible = not won
+	var cause_text := _death_cause_text()
+	var viewport_size := get_viewport_rect().size
+	if _over_bg_win:
+		_over_bg_win.visible = won
+	if _over_bg_lose:
+		_over_bg_lose.visible = not won
+	if _over_layer:
+		_over_layer.visible = true
 	var tex_arr := _win_textures if won else _lose_textures
 	var target_rect := _over_bg_win if won else _over_bg_lose
 	if target_rect and not tex_arr.is_empty():
 		var tex := _random_texture(tex_arr)
 		if tex:
 			target_rect.texture = tex
-	_hide_loading()
 	if _over_result:
 		_over_result.visible = true
 		_over_result.text = "Thou hast Triumphed!" if won else "Thou hast Perished!"
 		_over_result.add_theme_font_size_override("font_size", 64)
+		_over_result.modulate.a = 0.0
 	if _over_label:
 		_over_label.visible = true
 		_over_label.add_theme_font_size_override("font_size", 96)
 		_over_label.text = "Press Enter to restart"
+		_over_label.modulate.a = 0.0
 	if _over_score:
 		_over_score.add_theme_font_size_override("font_size", 80)
 		_over_score.text = "EXP: %d" % _score
-	_position_game_over_labels(get_viewport_rect().size)
+		_over_score.modulate.a = 0.0
+	if _over_cause:
+		_over_cause.visible = not won
+		_over_cause.add_theme_font_size_override("font_size", 80)
+		_over_cause.text = cause_text
+		_over_cause.modulate.a = 0.0
+	if _over_bg_win and won:
+		_over_bg_win.modulate.a = 0.0
+	if _over_bg_lose and not won:
+		_over_bg_lose.modulate.a = 0.0
+	_position_game_over_labels(viewport_size)
+	_hide_loading()
+	await _fade_to(level_fade_alpha, level_fade_out_time)
+	var tw := get_tree().create_tween()
+	tw.set_parallel(true)
+	if _fade:
+		tw.tween_property(_fade, "modulate:a", 0.0, level_fade_out_time)
+	if _over_bg_win and won:
+		tw.tween_property(_over_bg_win, "modulate:a", 1.0, level_fade_out_time)
+	if _over_bg_lose and not won:
+		tw.tween_property(_over_bg_lose, "modulate:a", 1.0, level_fade_out_time)
+	for node in [_over_result, _over_label, _over_score, _over_cause]:
+		if node and node.visible:
+			tw.tween_property(node, "modulate:a", 1.0, level_fade_out_time)
+	await tw.finished
 	_update_title_build_label()
 
 func _on_viewport_resized() -> void:
@@ -2800,6 +2854,18 @@ func _resize_fullscreen_art() -> void:
 	_position_game_over_labels(viewport_size)
 	_update_title_build_label()
 
+func _death_cause_text() -> String:
+	if _last_death_cause == &"trap":
+		return "Died of tetanus on Floor %d" % _level
+	if _last_death_cause == StringName() or _enemy_map.is_empty():
+		return "Defeated at the hands of a monster on Floor %d" % _level
+	for e in _enemy_map.values():
+		if e is Enemy and e.alive:
+			return "Defeated at the hands of a %s on Floor %d" % [String(e.enemy_type), _level]
+	if _last_death_cause != StringName():
+		return "Defeated at the hands of a %s on Floor %d" % [String(_last_death_cause), _level]
+	return "Defeated at the hands of a monster on Floor %d" % _level
+
 func _random_texture(options: Array[Texture2D]) -> Texture2D:
 	if options.is_empty():
 		return null
@@ -2815,14 +2881,19 @@ func _random_texture(options: Array[Texture2D]) -> Texture2D:
 func _position_game_over_labels(viewport_size: Vector2) -> void:
 	# Place result near top, then score, then restart prompt.
 	var result_y := viewport_size.y * 0.22
-	var score_y := viewport_size.y * 0.36
-	var prompt_y := viewport_size.y * 0.46
+	var cause_y := viewport_size.y * 0.33
+	var score_y := viewport_size.y * 0.42
+	var prompt_y := viewport_size.y * 0.52
 	var result_h := 80.0
+	var cause_h := 60.0
 	var score_h := 60.0
 	var prompt_h := 60.0
 	if _over_result:
 		_over_result.offset_top = result_y
 		_over_result.offset_bottom = result_y + result_h - viewport_size.y
+	if _over_cause:
+		_over_cause.offset_top = cause_y
+		_over_cause.offset_bottom = cause_y + cause_h - viewport_size.y
 	if _over_score:
 		_over_score.offset_top = score_y
 		_over_score.offset_bottom = score_y + score_h - viewport_size.y
@@ -3697,7 +3768,7 @@ func _try_use_potion() -> void:
 	_update_hud_icons()
 	_play_sfx(SFX_PICKUP1)
 	_blink_node(player)
-	_log_action("That's better")
+	_log_action("Healed 1 HP")
 
 func _ranged_dir_from_input() -> Vector2i:
 	# Allow combining held cardinals (e.g., J+I) to produce diagonals
@@ -3963,6 +4034,7 @@ func _apply_trap_damage() -> void:
 	if _game_over:
 		return
 	_apply_player_damage(1)
+	_last_death_cause = &"trap"
 
 func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 	if trap == null:
@@ -3972,7 +4044,7 @@ func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 		_traps.erase(trap)
 		trap.queue_free()
 		_last_trap_cell = Vector2i(-1, -1)
-		_log_action("Stuck!")
+		_log_action("Stuck in a spider web")
 		return
 	_apply_trap_damage()
 	_last_trap_cell = cell
@@ -3983,11 +4055,12 @@ func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 		return
 	if trap.trap_type == &"spiderweb":
 		enemy.web_stuck_turns = max(enemy.web_stuck_turns, _rng.randi_range(2, 5))
-		_log_action("Webbed an enemy!")
+		_log_action("%s got stuck in a spider web" % String(enemy.enemy_type).capitalize())
 		_traps.erase(trap)
 		trap.queue_free()
 		return
 	enemy.apply_damage(1)
+	_log_action("%s stepped on a spike trap" % String(enemy.enemy_type).capitalize())
 	if not enemy.alive:
 		enemy.visible = false
 		_remove_enemy_from_map(enemy)
@@ -4384,6 +4457,8 @@ func _remove_enemy_from_map(enemy: Enemy) -> void:
 		return
 	if _enemy_map.get(enemy.grid_cell, null) == enemy:
 		_enemy_map.erase(enemy.grid_cell)
+		if enemy.enemy_type != StringName():
+			_last_death_cause = enemy.enemy_type
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
 	var enemy: Enemy = _enemy_map.get(cell, null)
