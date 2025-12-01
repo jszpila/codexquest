@@ -5,6 +5,7 @@ const Enemy := preload("res://scripts/Enemy.gd")
 const Goblin := preload("res://scripts/Goblin.gd")
 const Zombie := preload("res://scripts/Zombie.gd")
 const Minotaur := preload("res://scripts/Minotaur.gd")
+const Imp := preload("res://scripts/Imp.gd")
 const Mouse := preload("res://scripts/Mouse.gd")
 const Skeleton := preload("res://scripts/Skeleton.gd")
 const Trap := preload("res://scripts/Trap.gd")
@@ -12,6 +13,7 @@ const Item := preload("res://scripts/Item.gd")
 const GOBLIN_SCENE: PackedScene = preload("res://scenes/Goblin.tscn")
 const ZOMBIE_SCENE: PackedScene = preload("res://scenes/Zombie.tscn")
 const MINOTAUR_SCENE: PackedScene = preload("res://scenes/Minotaur.tscn")
+const IMP_SCENE: PackedScene = preload("res://scenes/Imp.tscn")
 const SKELETON_SCENE: PackedScene = preload("res://scenes/Skeleton.tscn")
 const MOUSE_SCENE: PackedScene = preload("res://scenes/Mouse.tscn")
 const TRAP_SCENE: PackedScene = preload("res://scenes/Trap.tscn")
@@ -79,6 +81,8 @@ var ZOMBIE_TEX_1: Texture2D
 var ZOMBIE_TEX_2: Texture2D
 var MINO_TEX_1: Texture2D
 var MINO_TEX_2: Texture2D
+var IMP_TEX: Texture2D
+var IMP_DEAD_TEX: Texture2D
 var SKELETON_TEX_1: Texture2D
 var SKELETON_TEX_2: Texture2D
 var DOOR_TEX_1: Texture2D
@@ -274,10 +278,12 @@ func _load_spritesheet_textures() -> void:
 	HEART_TEX = _sheet_tex(&"heart", Vector2i(1014, 481), true)
 	GOBLIN_TEX_1 = _sheet_tex(&"goblin1", Vector2i(1352, 52), true)
 	DEAD_GOBLIN_TEX = _sheet_tex(&"goblin_dead", Vector2i(2613, 52), true)
-	ZOMBIE_TEX_1 = _sheet_tex(&"zombie1", Vector2i(1352, 117), true)
+	ZOMBIE_TEX_1 = _sheet_tex(&"zombie1", Vector2i(2626, 117), true)
 	ZOMBIE_TEX_2 = _sheet_tex(&"zombie2", Vector2i(2613, 117), true)
 	MINO_TEX_1 = _sheet_tex(&"mino1", Vector2i(1352, 208), true)
 	MINO_TEX_2 = _sheet_tex(&"mino2", Vector2i(2613, 208), true)
+	IMP_TEX = _sheet_tex(&"imp", Vector2i(2028, 260), true)
+	IMP_DEAD_TEX = _sheet_tex(&"imp_dead", Vector2i(2613, 260), true)
 	SKELETON_TEX_1 = _sheet_tex(&"skeleton1", Vector2i(1352, 130), true)
 	SKELETON_TEX_2 = _sheet_tex(&"skeleton_dead", Vector2i(2613, 130), true)
 	var mouse_tex := _sheet_tex(&"mouse", Vector2i(39, 182), true)
@@ -491,6 +497,7 @@ var _carried_potion: bool = false
 var _goblins: Array[Goblin] = []
 var _zombies: Array[Zombie] = []
 var _minotaurs: Array[Minotaur] = []
+var _imps: Array[Imp] = []
 var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
@@ -953,6 +960,9 @@ func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
 	for mino: Minotaur in _minotaurs:
 		if mino.alive and _enemy_can_act(mino):
 			_move_homing_enemy(mino)
+	for imp: Imp in _imps:
+		if imp.alive and _enemy_can_act(imp):
+			_imp_take_turn(imp)
 	_update_fov()
 	if _rune4_dash_cooldown > 0:
 		_rune4_dash_cooldown = max(0, _rune4_dash_cooldown - 1)
@@ -1038,6 +1048,91 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 	if trap2 != null:
 		_handle_enemy_hit_by_trap(enemy, trap2)
 
+func _move_enemy_away_from_player(enemy: Enemy) -> void:
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var start_dist: int = abs(enemy.grid_cell.x - player_cell.x) + abs(enemy.grid_cell.y - player_cell.y)
+	var dirs: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+	var best: Array[Vector2i] = []
+	var best_dist: int = start_dist
+	for d in dirs:
+		var dest := enemy.grid_cell + d
+		if not _can_enemy_step(dest, enemy):
+			continue
+		var trap := _trap_at(dest)
+		if trap != null:
+			# Running away: don't intentionally step into traps
+			continue
+		var dist: int = abs(dest.x - player_cell.x) + abs(dest.y - player_cell.y)
+		if dist > best_dist:
+			best_dist = dist
+			best = [dest]
+		elif dist == best_dist:
+			best.append(dest)
+	if best.is_empty():
+		_move_homing_enemy(enemy)
+		return
+	var pick := best[_rng.randi_range(0, best.size() - 1)]
+	_set_enemy_cell(enemy, pick)
+
+func _imp_targeting_data(origin: Vector2i, target: Vector2i) -> Dictionary:
+	var dx := target.x - origin.x
+	var dy := target.y - origin.y
+	var dist: int = max(abs(dx), abs(dy))
+	if dist < 1 or dist > 4:
+		return {}
+	var dir := Vector2i(sign(dx), sign(dy))
+	var aligned: bool = (dx == 0 or dy == 0 or abs(dx) == abs(dy))
+	if not aligned or dir == Vector2i.ZERO:
+		return {}
+	return {"dir": dir, "dist": dist}
+
+func _imp_line_clear(origin: Vector2i, dir: Vector2i, dist: int) -> bool:
+	for i in range(1, dist + 1):
+		var cell := origin + dir * i
+		if not _in_interior(cell):
+			return false
+		if _is_wall(cell):
+			return false
+		if i < dist:
+			if _get_enemy_at(cell) != null:
+				return false
+			if _trap_at(cell) != null:
+				return false
+	return true
+
+func _imp_miss_chance(dist: int) -> float:
+	return clampf(0.15 * float(max(0, dist - 1)), 0.0, 0.6)
+
+func _imp_fire_shot(imp: Imp, dir: Vector2i, dist: int, player_cell: Vector2i) -> void:
+	if imp == null or not imp.alive:
+		return
+	var origin := imp.grid_cell
+	var end_cell := origin + dir * dist
+	_fire_projectile(origin, end_cell, Color(0.9, 0.2, 0.2, 1))
+	imp.arrows = max(0, imp.arrows - 1)
+	imp.cooldown = 2
+	if _rng.randf() < _imp_miss_chance(dist):
+		_log_action("Imp whiffs!")
+		return
+	_apply_player_damage(1)
+	_log_action("Imp hits you!")
+
+func _imp_take_turn(imp: Imp) -> void:
+	if imp == null or not imp.alive:
+		return
+	imp.cooldown = max(0, imp.cooldown - 1)
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var targeting := _imp_targeting_data(imp.grid_cell, player_cell)
+	if imp.arrows > 0 and imp.cooldown == 0 and not targeting.is_empty():
+		var dir: Vector2i = targeting["dir"]
+		var dist: int = targeting["dist"]
+		if _imp_line_clear(imp.grid_cell, dir, dist):
+			_imp_fire_shot(imp, dir, dist, player_cell)
+			return
+	if imp.arrows <= 0:
+		_move_enemy_away_from_player(imp)
+	else:
+		_move_homing_enemy(imp)
 
 func _get_grid_size() -> Vector2i:
 	# Use a fixed world size (in tiles)
@@ -1093,6 +1188,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)
 	var is_free := Callable(self, "_is_free")
 	var has_free_neighbor := Callable(self, "_has_free_neighbor")
+	_enforce_melee_first_level_only()
 	_clear_enemies()
 	_clear_mice()
 	_clear_runes()
@@ -1450,6 +1546,13 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		m_exclude.append_array(zcells)
 		var mcell := _level_builder.pick_free_interior_cell(grid_size, m_exclude, is_free, has_free_neighbor)
 		_spawn_minotaur_at(mcell)
+	# Spawn imps at about the same rate as minotaurs (ranged threat)
+	var imp_count: int = mino_count
+	for i_imp in range(imp_count):
+		var i_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
+		i_exclude.append_array(zcells)
+		var icell := _level_builder.pick_free_interior_cell(grid_size, i_exclude, is_free, has_free_neighbor)
+		_spawn_imp_at(icell)
 	# Spawn 0-3 mice per level as non-hostile wanderers
 	var mice_count: int = _rng.randi_range(0, 3)
 	for i in range(mice_count):
@@ -1896,7 +1999,7 @@ func _handle_enemy_death(enemy: Enemy) -> void:
 func _enemy_score_value(enemy: Enemy) -> int:
 	if enemy == null:
 		return 0
-	if enemy.enemy_type == &"minotaur":
+	if enemy.enemy_type == &"minotaur" or enemy.enemy_type == &"imp":
 		return 2
 	return 1
 
@@ -1951,6 +2054,8 @@ func _leave_enemy_corpse(enemy: Enemy) -> void:
 			corpse_tex = ZOMBIE_TEX_2
 		elif enemy.enemy_type == &"minotaur":
 			corpse_tex = MINO_TEX_2
+		elif enemy.enemy_type == &"imp":
+			corpse_tex = IMP_DEAD_TEX
 	if corpse_tex == null:
 		return
 	var s := Sprite2D.new()
@@ -2294,6 +2399,15 @@ func _save_level_state(level: int) -> void:
 			"alive": m.alive,
 			"hp": m.hp
 		})
+	for imp in _imps:
+		enemies.append({
+			"type": "imp",
+			"cell": imp.grid_cell,
+			"alive": imp.alive,
+			"hp": imp.hp,
+			"arrows": imp.arrows,
+			"cooldown": imp.cooldown
+		})
 	for sk in _skeletons:
 		enemies.append({
 			"type": "skeleton",
@@ -2474,6 +2588,16 @@ func _restore_entities_from_state(level: int) -> void:
 				_minotaurs.back().alive = false
 				_minotaurs.back().visible = false
 				_remove_enemy_from_map(_minotaurs.back())
+		elif etype == "imp":
+			var icell := cell
+			_spawn_imp_at(icell)
+			_imps.back().hp = e.get("hp", _imps.back().hp)
+			_imps.back().arrows = e.get("arrows", _imps.back().arrows)
+			_imps.back().cooldown = e.get("cooldown", _imps.back().cooldown)
+			if not alive:
+				_imps.back().alive = false
+				_imps.back().visible = false
+				_remove_enemy_from_map(_imps.back())
 		elif etype == "skeleton":
 			var skcell := cell
 			_spawn_skeleton_at(skcell)
@@ -2715,9 +2839,9 @@ func _set_world_visible(visible: bool) -> void:
 	if _key_node:
 		_key_node.visible = visible and _key_on_level and not _key_collected
 	if _sword_node:
-		_sword_node.visible = visible and not _sword_collected
+		_sword_node.visible = visible and not _sword_collected and _level == 1
 	if _shield_node:
-		_shield_node.visible = visible and not _shield_collected
+		_shield_node.visible = visible and not _shield_collected and _level == 1
 	if _potion_node:
 		_potion_node.visible = visible and not _potion_collected
 	if _potion2_node:
@@ -2761,6 +2885,8 @@ func _set_world_visible(visible: bool) -> void:
 		m.visible = visible and m.alive
 	for sk in _skeletons:
 		sk.visible = visible and sk.alive
+	for imp in _imps:
+		imp.visible = visible and imp.alive
 	for t in _traps:
 		t.visible = visible
 	for mouse in _mice:
@@ -2775,6 +2901,16 @@ func _set_world_visible(visible: bool) -> void:
 		_entrance_door_node.visible = visible and _level > 1
 	_apply_final_door_fx()
 	_update_hud_icons()
+
+func _enforce_melee_first_level_only() -> void:
+	if _level == 1:
+		return
+	_sword_cell = Vector2i(-1, -1)
+	_shield_cell = Vector2i(-1, -1)
+	if _sword_node:
+		_sword_node.visible = false
+	if _shield_node:
+		_shield_node.visible = false
 
 func _ensure_fov_overlay() -> void:
 	if _fov_overlay == null:
@@ -2888,6 +3024,13 @@ func _spawn_minotaur_at(cell: Vector2i) -> void:
 	_register_enemy(node)
 	_minotaurs.append(node)
 
+func _spawn_imp_at(cell: Vector2i) -> void:
+	var node: Imp = IMP_SCENE.instantiate() as Imp
+	node.setup(cell, IMP_TEX, IMP_DEAD_TEX)
+	add_child(node)
+	_register_enemy(node)
+	_imps.append(node)
+
 func _spawn_mouse_at(cell: Vector2i) -> void:
 	var node: Mouse = MOUSE_SCENE.instantiate() as Mouse
 	var tex: Texture2D = _sheet_tex_cache.get(&"mouse_tex", null)
@@ -2925,11 +3068,14 @@ func _clear_enemies() -> void:
 		child.queue_free()
 	for child: Minotaur in _minotaurs:
 		child.queue_free()
+	for child: Imp in _imps:
+		child.queue_free()
 	for child: Skeleton in _skeletons:
 		child.queue_free()
 	_goblins.clear()
 	_zombies.clear()
 	_minotaurs.clear()
+	_imps.clear()
 	_skeletons.clear()
 	_enemy_map.clear()
 	_clear_mice()
@@ -3354,6 +3500,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_ensure_fov_overlay()
 	if _level_states.has(_level):
 		_restore_level_state(_level, entering_forward)
+		_enforce_melee_first_level_only()
 		_apply_restored_items()
 		_restore_entities_from_state(_level)
 	else:

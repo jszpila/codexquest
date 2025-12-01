@@ -16,11 +16,14 @@ func _run() -> void:
 	_test_enemy_registry()
 	_test_bresenham_line()
 	_test_player_sprite_ranged_switch()
+	_test_melee_only_level_one_visibility()
+	_test_imp_targeting()
+	_test_imp_miss_curve()
 	if not _failures.is_empty():
 		for f in _failures:
 			printerr(f)
 	else:
-		print("All tests passed (%d)" % 5)
+		print("All tests passed (%d)" % 8)
 
 func _assert_true(cond: bool, msg: String) -> void:
 	if not cond:
@@ -103,3 +106,66 @@ func _test_player_sprite_ranged_switch() -> void:
 	main._player_sprite.queue_free()
 	main.queue_free()
 	main = null
+
+func _test_melee_only_level_one_visibility() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	main.floor_map = TileMap.new()
+	main.walls_map = TileMap.new()
+	main.player = Node2D.new()
+	main._decor = Node2D.new()
+	main._sword_node = Item.new()
+	main._shield_node = Item.new()
+	main._sword_cell = Vector2i(2, 2)
+	main._shield_cell = Vector2i(3, 3)
+	main._sword_collected = false
+	main._shield_collected = false
+	main._level = 2
+	main._enforce_melee_first_level_only()
+	_assert_eq(main._sword_cell, Vector2i(-1, -1), "Sword cell should be cleared on levels >1")
+	_assert_eq(main._shield_cell, Vector2i(-1, -1), "Shield cell should be cleared on levels >1")
+	main._set_world_visible(true)
+	_assert_true(not main._sword_node.visible and not main._shield_node.visible, "Sword/Shield should be hidden on levels >1")
+	main._level = 1
+	main._sword_cell = Vector2i(4, 4)
+	main._shield_cell = Vector2i(5, 5)
+	main._enforce_melee_first_level_only()
+	_assert_eq(main._sword_cell, Vector2i(4, 4), "Sword cell should persist on level 1")
+	_assert_eq(main._shield_cell, Vector2i(5, 5), "Shield cell should persist on level 1")
+	main._set_world_visible(true)
+	_assert_true(main._sword_node.visible and main._shield_node.visible, "Sword/Shield should be visible on level 1 when uncollected")
+	main._sword_node.queue_free()
+	main._shield_node.queue_free()
+	main.floor_map.queue_free()
+	main.walls_map.queue_free()
+	main.player.queue_free()
+	main._decor.queue_free()
+	main.queue_free()
+
+func _test_imp_targeting() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	main.walls_map = TileMap.new()
+	main._grid_size = Vector2i(10, 10)
+	var origin := Vector2i(4, 4)
+	var target := Vector2i(4, 7)
+	var data: Dictionary = main._imp_targeting_data(origin, target)
+	_assert_true(not data.is_empty(), "Imp should find target aligned within range")
+	_assert_eq(data.get("dir", Vector2i.ZERO), Vector2i(0, 1), "Imp direction should point toward player")
+	_assert_eq(data.get("dist", 0), 3, "Imp distance should match grid delta")
+	var far_target := Vector2i(4, 9)
+	_assert_true(main._imp_targeting_data(origin, far_target).is_empty(), "Imp should ignore targets past range")
+	var off_axis := Vector2i(5, 7)
+	_assert_true(main._imp_targeting_data(origin, off_axis).is_empty(), "Imp should ignore unaligned targets")
+	main.walls_map.queue_free()
+	main.queue_free()
+
+func _test_imp_miss_curve() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	var close: float = main._imp_miss_chance(1)
+	var mid: float = main._imp_miss_chance(3)
+	var far: float = main._imp_miss_chance(4)
+	_assert_true(close <= mid and mid <= far, "Imp miss chance should not decrease with distance")
+	_assert_true(far <= 0.6, "Imp miss chance should clamp at or below 60%")
+	main.queue_free()

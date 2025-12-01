@@ -2,7 +2,7 @@
 
 ![Chasm of Belligerence](assets/CoB-title.png "Chasm of Belligerence")  
 
-An adventure in vibe coding with Codex, Gemini, Claude, and Godot. See it in action at [jszpila.github.io/codexquest](https://jszpila.github.io/codexquest/)
+An adventure in vibe coding with Codex, Gemini, Claude, and Godot. See it in action at [jszpila.github.io/chasm-of-belligerence](https://jszpila.github.io/chasm-of-belligerence/)
 
 ## Asset Credits
 
