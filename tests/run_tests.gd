@@ -20,11 +20,12 @@ func _run() -> void:
 	_test_imp_targeting()
 	_test_imp_miss_curve()
 	_test_game_over_cause_label()
+	_test_cheese_spawn_and_handin()
 	if not _failures.is_empty():
 		for f in _failures:
 			printerr(f)
 	else:
-		print("All tests passed (%d)" % 9)
+		print("All tests passed (%d)" % 10)
 
 func _assert_true(cond: bool, msg: String) -> void:
 	if not cond:
@@ -187,4 +188,29 @@ func _test_game_over_cause_label() -> void:
 	_assert_true(cause.find("tetanus") != -1, "Cause label should include trap cause")
 	_assert_true(cause.find("3") != -1, "Cause label should include floor number")
 	enemy.queue_free()
+	main.queue_free()
+
+func _test_cheese_spawn_and_handin() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	main._grid_size = Vector2i(10, 10)
+	main._cheese_level = 1
+	main._level = 1
+	main._cheese_collected = false
+	main._cheese_given = false
+	main._cheese_cell = Vector2i(2, 2)
+	main._attack_level_bonus = 0
+	main._defense_level_bonus = 0
+	main._cheese_collected = true
+	var mouse_script: Script = load("res://scripts/Mouse.gd")
+	var mouse: Node2D = mouse_script.new()
+	mouse.grid_cell = main._cheese_cell
+	mouse.alive = true
+	main._mice.append(mouse)
+	main._try_give_cheese(main._cheese_cell)
+	_assert_true(main._cheese_given, "Cheese should be given to mouse")
+	_assert_eq(main._attack_level_bonus, 1, "Cheese should grant +1 ATK")
+	_assert_eq(main._defense_level_bonus, 1, "Cheese should grant +1 DEF")
+	mouse.queue_free()
+	main._mice.clear()
 	main.queue_free()

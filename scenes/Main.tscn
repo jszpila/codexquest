@@ -278,10 +278,10 @@ size_flags_vertical = 4
 theme_override_styles/panel = SubResource("4")
 
 [node name="HUDItemsContainer" type="GridContainer" parent="HUD/HUDBar/HUDItems"]
-custom_minimum_size = Vector2(320, 64)
+custom_minimum_size = Vector2(360, 64)
 layout_mode = 2
 size_flags_vertical = 4
-columns = 8
+columns = 9
 
 [node name="HUDKey1Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
@@ -388,6 +388,14 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="HUDPotionIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HUDCheeseIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4

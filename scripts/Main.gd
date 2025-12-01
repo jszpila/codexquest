@@ -61,6 +61,7 @@ const RUNE4_DASH_COOLDOWN_MOVES := 20
 const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
 const DEBUG_SPAWN_ALL_ITEMS := false
+const DEBUG_SPAWN_CHEESE := false
 const RANGED_INPUT_LOCK := 0.12
 const EARLY_LEVEL_WEIGHT := 3
 const ACTION_LOG_MAX := 5
@@ -105,6 +106,7 @@ var RUNE3_TEX: Texture2D
 var RUNE4_TEX: Texture2D
 var TORCH_TEX: Texture2D
 var RING_TEX: Texture2D
+var CHEESE_TEX: Texture2D
 var ARMOR_ICON_TEX: Texture2D
 var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
@@ -167,6 +169,7 @@ var _action_log: Array[String] = []
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRingIcon
 @onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDPotionIcon
+@onready var _hud_icon_cheese: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDCheeseIcon
 @onready var _hud_icon_bow: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot/HUDBowIcon
 @onready var _hud_icon_wand: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDWandSlot/HUDWandIcon
 @onready var _hud_bow_panel: PanelContainer = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDBowSlot
@@ -309,6 +312,7 @@ func _load_spritesheet_textures() -> void:
 	RUNE4_TEX = _sheet_tex(&"rune4", Vector2i(455, 221), true)
 	TORCH_TEX = _sheet_tex(&"torch", Vector2i(52, 546), true)
 	RING_TEX = _sheet_tex(&"ring", Vector2i(156, 559), true)
+	CHEESE_TEX = _sheet_tex(&"cheese", Vector2i(91, 221), true)
 	ARMOR_ICON_TEX = _sheet_tex(&"armor_icon", Vector2i(338, 156), true)
 	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
 	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
@@ -462,6 +466,7 @@ var _rune4_cells: Array[Vector2i] = []
 var _torch_cell: Vector2i = Vector2i.ZERO
 var _ring_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
+var _cheese_cell: Vector2i = Vector2i.ZERO
 var _key_collected: bool = false
 var _key_on_level: bool = false
 var _entrance_cell: Vector2i = Vector2i.ZERO
@@ -480,6 +485,7 @@ var _torch_collected: bool = false
 var _ring_collected: bool = false
 var _codex_collected: bool = false
 var _crown_collected: bool = false
+var _cheese_collected: bool = false
 var _key1_icon_persistent: bool = false
 var _key2_icon_persistent: bool = false
 var _key3_icon_persistent: bool = false
@@ -515,6 +521,7 @@ var _rune3_nodes: Array[Item] = []
 var _rune4_nodes: Array[Item] = []
 var _torch_node: Item
 var _ring_node: Item
+var _cheese_node: Item
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
@@ -551,6 +558,8 @@ var _player_level: int = 0
 var _rune4_dash_cooldown: int = 0
 var _last_death_cause: StringName = StringName()
 var _ranged_fire_lock: float = 0.0
+var _cheese_given: bool = false
+var _cheese_level: int = -1
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -782,6 +791,17 @@ func _process(_delta: float) -> void:
 		_add_score(1)
 		_update_player_sprite_appearance()
 		_log_action("Picked up Torch")
+	if not _cheese_collected and not _cheese_given and cp == _cheese_cell:
+		_cheese_collected = true
+		_cheese_cell = Vector2i(-1, -1)
+		print("GOT CHEESE")
+		if _cheese_node:
+			_cheese_node.collect()
+		_play_sfx(SFX_PICKUP1)
+		_blink_node(player)
+		_add_score(1)
+		_update_hud_icons()
+		_log_action("Picked up Cheese")
 	if not _ring_collected and _current_level_special_type() == &"ring" and cp == _ring_cell:
 		_ring_collected = true
 		print("GOT RING")
@@ -861,6 +881,7 @@ func _process(_delta: float) -> void:
 				_add_score(1)
 				_log_action("Picked up Armor")
 				break
+		_try_give_cheese(cp)
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -1331,6 +1352,20 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_potion2_collected = true
 		if _potion2_node:
 			_potion2_node.visible = false
+	# Place cheese (max once per run)
+	if _cheese_level == _level and not _cheese_collected and not _cheese_given:
+		if _cheese_node == null:
+			_cheese_node = _make_item_node("Cheese", CHEESE_TEX)
+			add_child(_cheese_node)
+		var cheese_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _potion2_cell, _wand_cell, _bow_cell]
+		_cheese_cell = _level_builder.pick_free_interior_cell(grid_size, cheese_exclude, is_free, has_free_neighbor)
+		_cheese_node.place(_cheese_cell)
+		_normalize_item_node(_cheese_node, CHEESE_TEX)
+		_cheese_node.visible = true
+	else:
+		_cheese_cell = Vector2i(-1, -1)
+		if _cheese_node:
+			_cheese_node.visible = false
 	# Place arrows (planned: max 1 per level, min 1/max 3 per game)
 	_arrow_cells.clear()
 	var arrow_pickups := int(_arrow_plan.get(_level, 0))
@@ -1341,6 +1376,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			arrow_exclude.append(_potion_cell)
 		if _potion2_cell != Vector2i(-1, -1):
 			arrow_exclude.append(_potion2_cell)
+		if _cheese_cell != Vector2i(-1, -1):
+			arrow_exclude.append(_cheese_cell)
 		for i_a in range(arrow_pickups):
 			var acell := _level_builder.pick_free_interior_cell(grid_size, arrow_exclude, is_free, has_free_neighbor)
 			arrow_exclude.append(acell)
@@ -1371,6 +1408,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			b_exclude.append(_potion_cell)
 		if _potion2_cell != Vector2i(-1, -1):
 			b_exclude.append(_potion2_cell)
+		if _cheese_cell != Vector2i(-1, -1):
+			b_exclude.append(_cheese_cell)
 		for ac in _arrow_cells:
 			b_exclude.append(ac)
 		for i_b in range(brazier_count):
@@ -1599,7 +1638,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			_potion2_cell,
 			_codex_cell,
 			_torch_cell,
-			_ring_cell
+			_ring_cell,
+			_cheese_cell
 		]
 		t_exclude.append_array(_rune1_cells)
 		t_exclude.append_array(_rune2_cells)
@@ -2315,6 +2355,16 @@ func _apply_restored_items() -> void:
 			_torch_node.visible = true
 		else:
 			_torch_node.visible = false
+	if _cheese_level == _level and _cheese_node == null:
+		_cheese_node = _make_item_node("Cheese", CHEESE_TEX)
+		add_child(_cheese_node)
+	if _cheese_node:
+		if _level == _cheese_level and not _cheese_collected and not _cheese_given and _cheese_cell != Vector2i(-1, -1):
+			_cheese_node.place(_cheese_cell)
+			_normalize_item_node(_cheese_node, CHEESE_TEX)
+			_cheese_node.visible = true
+		else:
+			_cheese_node.visible = false
 	if _wand_node:
 		if _level == _wand_level and not _wand_collected and _wand_cell != Vector2i(-1, -1):
 			_wand_node.place(_wand_cell)
@@ -2379,6 +2429,9 @@ func _save_level_state(level: int) -> void:
 	state["crown_collected"] = _crown_collected
 	state["torch_cell"] = _torch_cell
 	state["torch_collected"] = _torch_collected
+	state["cheese_cell"] = _cheese_cell
+	state["cheese_collected"] = _cheese_collected
+	state["cheese_given"] = _cheese_given
 	state["rune1_cells"] = []
 	state["rune2_cells"] = []
 	state["rune3_cells"] = []
@@ -2516,6 +2569,9 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	_crown_collected = state.get("crown_collected", _crown_collected)
 	_torch_cell = state.get("torch_cell", _torch_cell)
 	_torch_collected = state.get("torch_collected", _torch_collected)
+	_cheese_cell = state.get("cheese_cell", _cheese_cell)
+	_cheese_collected = state.get("cheese_collected", _cheese_collected)
+	_cheese_given = state.get("cheese_given", _cheese_given)
 	_door_cell = state.get("exit_cell", _door_cell)
 	_entrance_cell = state.get("entrance_cell", _entrance_cell)
 	_door_is_open = state.get("door_open", false)
@@ -2700,6 +2756,8 @@ func _start_game() -> void:
 	_wand_collected = false
 	_bow_collected = false
 	_torch_collected = false
+	_cheese_collected = false
+	_cheese_given = false
 	_ring_collected = false
 	_codex_collected = false
 	_crown_collected = false
@@ -2708,6 +2766,7 @@ func _start_game() -> void:
 	_rune2_collected_count = 0
 	_rune3_collected_count = 0
 	_ring_cell = Vector2i.ZERO
+	_cheese_cell = Vector2i.ZERO
 	_wand_cell = Vector2i.ZERO
 	_bow_cell = Vector2i.ZERO
 	_arrow_cells.clear()
@@ -2917,6 +2976,8 @@ func _set_world_visible(visible: bool) -> void:
 		_potion_node.visible = visible and not _potion_collected
 	if _potion2_node:
 		_potion2_node.visible = visible and _level >= 2 and not _potion2_collected
+	if _cheese_node:
+		_cheese_node.visible = visible and not _cheese_collected and not _cheese_given and _level == _cheese_level
 	if _torch_node:
 		_torch_node.visible = visible and not _torch_collected and _level == _torch_target_level
 	if _ring_node:
@@ -2972,6 +3033,20 @@ func _set_world_visible(visible: bool) -> void:
 		_entrance_door_node.visible = visible and _level > 1
 	_apply_final_door_fx()
 	_update_hud_icons()
+
+func _try_give_cheese(cell: Vector2i) -> void:
+	if not _cheese_collected or _cheese_given:
+		return
+	var mouse := _mouse_at(cell)
+	if mouse == null:
+		return
+	_cheese_given = true
+	_cheese_collected = false
+	_attack_level_bonus += 1
+	_defense_level_bonus += 1
+	_play_sfx(SFX_PICKUP1)
+	_update_hud_icons()
+	_log_action("The mouse says \"Thank you!\" ( +1 ATK, +1 DEF)")
 
 func _enforce_melee_first_level_only() -> void:
 	if _level == 1:
@@ -3218,6 +3293,9 @@ func _reset_items_visibility() -> void:
 	if _potion2_node:
 		_potion2_node.collected = _potion2_collected
 		_potion2_node.visible = not _potion2_collected and _potion2_cell != Vector2i(-1, -1)
+	if _cheese_node:
+		_cheese_node.collected = _cheese_collected
+		_cheese_node.visible = (_level == _cheese_level) and not _cheese_collected and not _cheese_given and _cheese_cell != Vector2i(-1, -1)
 	if _codex_node:
 		var st := _current_level_special_type()
 		var needs_special := st == &"codex" or st == &"crown"
@@ -3677,6 +3755,9 @@ func _update_hud_icons() -> void:
 	if _hud_icon_potion and POTION_TEX:
 		_hud_icon_potion.texture = POTION_TEX
 	_set_icon_visible(_hud_icon_potion, show and _carried_potion)
+	if _hud_icon_cheese and CHEESE_TEX:
+		_hud_icon_cheese.texture = CHEESE_TEX
+	_set_icon_visible(_hud_icon_cheese, show and _cheese_collected and not _cheese_given)
 	if _hud_atk_label:
 		_hud_atk_label.visible = show
 		_hud_atk_label.text = "ATK: %d" % _attack_bonus()
@@ -4115,7 +4196,8 @@ func _play_sfx(stream: AudioStream) -> void:
 	if player == null:
 		return
 	player.stream = stream
-	player.play()
+	if player.is_inside_tree():
+		player.play()
 
 func _get_audio_player() -> AudioStreamPlayer:
 	for p in _audio_pool:
@@ -4150,6 +4232,8 @@ func _set_level_item_textures() -> void:
 		(_potion_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	if _potion2_node and _potion2_node.get_node_or_null("Sprite2D") is Sprite2D:
 		(_potion2_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _cheese_node and _cheese_node.get_node_or_null("Sprite2D") is Sprite2D:
+		(_cheese_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	if _wand_node and _wand_node.get_node_or_null("Sprite2D") is Sprite2D:
 		var w_s := _wand_node.get_node("Sprite2D") as Sprite2D
 		w_s.texture = WAND_TEX if WAND_TEX != null else w_s.texture
@@ -4353,6 +4437,9 @@ func _prepare_run_layout() -> void:
 	_rune4_plan.clear()
 	_arrow_plan.clear()
 	_tileset_plan.clear()
+	_cheese_level = -1
+	_cheese_given = false
+	_cheese_collected = false
 	var levels: Array[int] = []
 	for i in range(1, _max_level + 1):
 		levels.append(i)
@@ -4438,6 +4525,11 @@ func _prepare_run_layout() -> void:
 		_torch_target_level = 1
 		_level_special_map[1] = &"ring"
 		_special_levels[&"ring"] = 1
+		_cheese_level = 1
+	if DEBUG_SPAWN_CHEESE:
+		_cheese_level = 1
+	elif _rng.randf() < 0.5:
+		_cheese_level = _pick_weighted_early_level.call()
 
 func _register_enemy(enemy: Enemy) -> void:
 	if enemy == null:
