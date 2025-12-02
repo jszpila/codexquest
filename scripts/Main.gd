@@ -1,15 +1,15 @@
 extends Node2D
 
-const LevelBuilder := preload("res://scripts/LevelBuilder.gd")
-const Enemy := preload("res://scripts/Enemy.gd")
-const Goblin := preload("res://scripts/Goblin.gd")
-const Zombie := preload("res://scripts/Zombie.gd")
-const Minotaur := preload("res://scripts/Minotaur.gd")
-const Imp := preload("res://scripts/Imp.gd")
-const Mouse := preload("res://scripts/Mouse.gd")
-const Skeleton := preload("res://scripts/Skeleton.gd")
-const Trap := preload("res://scripts/Trap.gd")
-const Item := preload("res://scripts/Item.gd")
+const LevelBuilder: Script = preload("res://scripts/LevelBuilder.gd")
+const Enemy: Script = preload("res://scripts/Enemy.gd")
+const Goblin: Script = preload("res://scripts/Goblin.gd")
+const Zombie: Script = preload("res://scripts/Zombie.gd")
+const Minotaur: Script = preload("res://scripts/Minotaur.gd")
+const Imp: Script = preload("res://scripts/Imp.gd")
+const Mouse: Script = preload("res://scripts/Mouse.gd")
+const Skeleton: Script = preload("res://scripts/Skeleton.gd")
+const Trap: Script = preload("res://scripts/Trap.gd")
+const Item: Script = preload("res://scripts/Item.gd")
 const GOBLIN_SCENE: PackedScene = preload("res://scenes/Goblin.tscn")
 const ZOMBIE_SCENE: PackedScene = preload("res://scenes/Zombie.tscn")
 const MINOTAUR_SCENE: PackedScene = preload("res://scenes/Minotaur.tscn")
@@ -17,19 +17,19 @@ const IMP_SCENE: PackedScene = preload("res://scenes/Imp.tscn")
 const SKELETON_SCENE: PackedScene = preload("res://scenes/Skeleton.tscn")
 const MOUSE_SCENE: PackedScene = preload("res://scenes/Mouse.tscn")
 const TRAP_SCENE: PackedScene = preload("res://scenes/Trap.tscn")
-const SPRITESHEET_PATH := "res://assets/spritesheet.png"
-const SHEET_CELL := 13
-const SHEET_SPRITE_SIZE := Vector2i(12, 12)
-const GRID_W := 40 # unused; kept for reference
-const GRID_H := 25 # unused; kept for reference
+const SPRITESHEET_PATH: String = "res://assets/spritesheet.png"
+const SHEET_CELL: int = 13
+const SHEET_SPRITE_SIZE: Vector2i = Vector2i(12, 12)
+const GRID_W: int = 40 # unused; kept for reference
+const GRID_H: int = 25 # unused; kept for reference
 
 const TILE_FLOOR: Vector2i = Vector2i(0, 0)
 const TILE_WALL: Vector2i = Vector2i(0, 0)
-const TILESET_A := &"tile_set_a"
-const TILESET_B := &"tile_set_b"
-const TILESET_C := &"tile_set_c"
-const FIXED_GRID_W := 48
-const FIXED_GRID_H := 36
+const TILESET_A: StringName = &"tile_set_a"
+const TILESET_B: StringName = &"tile_set_b"
+const TILESET_C: StringName = &"tile_set_c"
+const FIXED_GRID_W: int = 48
+const FIXED_GRID_H: int = 36
 
 const SFX_PICKUP1: AudioStream = preload("res://assets/pickup-1.wav")
 const SFX_PICKUP2: AudioStream = preload("res://assets/pickup-2.wav")
@@ -42,33 +42,33 @@ const SFX_DOOR_OPEN: AudioStream = preload("res://assets/door-open.wav")
 const SFX_START: AudioStream = preload("res://assets/start.wav")
 const SFX_BOW: AudioStream = preload("res://assets/bow.wav")
 const SFX_WAND: AudioStream = preload("res://assets/wand.wav")
-const SIGHT_INNER_TILES := 5
-const SIGHT_OUTER_TILES := 10
-const SIGHT_MAX_DARK := 0.8
-const FLOOR_ALPHA_MIN := 1.0
-const FLOOR_ALPHA_MAX := 1.0
-const BONE_ALPHA_MIN := 1.0
-const BONE_ALPHA_MAX := 1.0
-const ARMOR_MAX := 3
-const LEVEL_UP_SCORE_STEP := 10
-const HP_MAX_LIMIT := 5
-const RANGED_WAND := &"wand"
-const RANGED_BOW := &"bow"
-const RANGED_NONE := &"none"
-const ARROWS_PER_PICKUP := 3
-const RUNE4_DASH_RANGE := 5
-const RUNE4_DASH_COOLDOWN_MOVES := 20
-const SHARED_FLOOR_WEIGHT := 0.15
-const DEBUG_FORCE_RANGED := false
-const DEBUG_SPAWN_ALL_ITEMS := false
-const DEBUG_SPAWN_CHEESE := false
-const RANGED_INPUT_LOCK := 0.12
-const EARLY_LEVEL_WEIGHT := 3
-const ACTION_LOG_MAX := 5
-const ACTION_LOG_OPACITIES := [1.0, 0.8, 0.6, 0.4, 0.2]
-const ACTION_LOG_FONT_SIZE := 28
-const FINAL_DOOR_PULSE_SCALE := 0.06
-const FINAL_DOOR_PULSE_TIME := 0.6
+const SIGHT_INNER_TILES: int = 5
+const SIGHT_OUTER_TILES: int = 10
+const SIGHT_MAX_DARK: float = 0.8
+const FLOOR_ALPHA_MIN: float = 1.0
+const FLOOR_ALPHA_MAX: float = 1.0
+const BONE_ALPHA_MIN: float = 1.0
+const BONE_ALPHA_MAX: float = 1.0
+const ARMOR_MAX: int = 3
+const LEVEL_UP_SCORE_STEP: int = 10
+const HP_MAX_LIMIT: int = 5
+const RANGED_WAND: StringName = &"wand"
+const RANGED_BOW: StringName = &"bow"
+const RANGED_NONE: StringName = &"none"
+const ARROWS_PER_PICKUP: int = 3
+const RUNE4_DASH_RANGE: int = 5
+const RUNE4_DASH_COOLDOWN_MOVES: int = 20
+const SHARED_FLOOR_WEIGHT: float = 0.15
+const DEBUG_FORCE_RANGED: bool = false
+const DEBUG_SPAWN_ALL_ITEMS: bool = false
+const DEBUG_SPAWN_CHEESE: bool = false
+const RANGED_INPUT_LOCK: float = 0.12
+const EARLY_LEVEL_WEIGHT: int = 3
+const ACTION_LOG_MAX: int = 5
+const ACTION_LOG_OPACITIES: Array[float] = [1.0, 0.8, 0.6, 0.4, 0.2]
+const ACTION_LOG_FONT_SIZE: int = 28
+const FINAL_DOOR_PULSE_SCALE: float = 0.06
+const FINAL_DOOR_PULSE_TIME: float = 0.6
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -111,12 +111,12 @@ var ARMOR_ICON_TEX: Texture2D
 var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
 var TRAP_WEB_TEX: Texture2D
-var BRAZIER_TEX: Texture2D
-var WAND_TEX: Texture2D
-var BOW_TEX: Texture2D
-var ARROW_TEX: Texture2D
+var BRAZIER_TEX: Texture2D = null
+var WAND_TEX: Texture2D = null
+var BOW_TEX: Texture2D = null
+var ARROW_TEX: Texture2D = null
 var BONE_TEXTURES: Array[Texture2D] = []
-var SPIDERWEB_TEXTURES := {}
+var SPIDERWEB_TEXTURES: Dictionary = {}
 var FLOOR_TEXTURES_A: Array[Texture2D] = []
 var FLOOR_TEXTURES_B: Array[Texture2D] = []
 var FLOOR_TEXTURES_C: Array[Texture2D] = []
@@ -124,16 +124,16 @@ var FLOOR_TEXTURES_SHARED: Array[Texture2D] = []
 var WALL_TEXTURES_A: Array[Texture2D] = []
 var WALL_TEXTURES_B: Array[Texture2D] = []
 var WALL_TEXTURES_C: Array[Texture2D] = []
-var _floor_sources_by_set := {}
-var _wall_sources_by_set := {}
+var _floor_sources_by_set: Dictionary = {}
+var _wall_sources_by_set: Dictionary = {}
 var _shared_floor_sources: Array[int] = []
 var _current_floor_sources_base: Array[int] = []
 var _current_floor_sources: Array[int] = []
 var _current_wall_sources: Array[int] = []
-var _tileset_plan := {}
+var _tileset_plan: Dictionary = {}
 var _tileset_choices: Array[StringName] = [TILESET_A, TILESET_B, TILESET_C]
 var _sheet_image: Image
-var _sheet_tex_cache := {}
+var _sheet_tex_cache: Dictionary = {}
 var _ranged_highlight: StyleBoxFlat
 var _ranged_inactive: StyleBoxFlat
 var _debug_bow_outline: Line2D
@@ -177,7 +177,7 @@ var _action_log: Array[String] = []
 @onready var _hud_arrow_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDArrows
 @onready var _action_log_box: VBoxContainer = $ActionLogLayer/ActionLog
 var _hud_action_lines: Array[Label] = []
-const ACTION_LOG_FONT := preload("res://assets/m5x7.ttf")
+const ACTION_LOG_FONT: Font = preload("res://assets/m5x7.ttf")
 @onready var _hud_armor: HBoxContainer = $HUD/HUDBar/HUDVitals/ArmorBorder/Armor
 @onready var _hud_player_level: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDPlayerLevel
 @onready var _hud_atk_label: Label = $HUD/HUDBar/HUDTextGroup/HUDTextGrid/HUDATKLabel
@@ -531,8 +531,8 @@ var _max_level: int = 2
 var _is_transitioning: bool = false
 var _torch_target_level: int = 1
 var _last_trap_cell: Vector2i = Vector2i(-1, -1)
-var _bone_cells := {}
-var _bone_spawn_outcomes := {}
+var _bone_cells: Dictionary = {}
+var _bone_spawn_outcomes: Dictionary = {}
 var _web_stuck_turns: int = 0
 var _spiderweb_nodes: Array[Sprite2D] = []
 var _corpse_nodes: Array[Sprite2D] = []
@@ -540,16 +540,16 @@ var _brazier_cells: Array[Vector2i] = []
 var _brazier_nodes: Array[Node2D] = []
 var _door_glow: PointLight2D
 var _door_pulse_tween: Tween
-var _level_special_map := {} # level -> special type
-var _special_levels := {} # special type -> level
-var _level_key_map := {} # level -> key type
-var _armor_plan := {} # level -> count
-var _rune1_plan := {} # level -> count
-var _rune2_plan := {}
-var _rune3_plan := {}
-var _rune4_plan := {}
-var _arrow_plan := {} # level -> 0/1 arrow pickup
-var _level_states := {}
+var _level_special_map: Dictionary = {} # level -> special type
+var _special_levels: Dictionary = {} # special type -> level
+var _level_key_map: Dictionary = {} # level -> key type
+var _armor_plan: Dictionary = {} # level -> count
+var _rune1_plan: Dictionary = {}
+var _rune2_plan: Dictionary = {}
+var _rune3_plan: Dictionary = {}
+var _rune4_plan: Dictionary = {}
+var _arrow_plan: Dictionary = {} # level -> 0/1 arrow pickup
+var _level_states: Dictionary = {}
 var _wand_level: int = 1
 var _bow_level: int = 1
 var _arrow_count: int = 0
@@ -561,9 +561,9 @@ var _ranged_fire_lock: float = 0.0
 var _cheese_given: bool = false
 var _cheese_level: int = -1
 
-const STATE_TITLE := 0
-const STATE_PLAYING := 1
-const STATE_GAME_OVER := 2
+const STATE_TITLE: int = 0
+const STATE_PLAYING: int = 1
+const STATE_GAME_OVER: int = 2
 var _state: int = STATE_TITLE
 
 func _ready() -> void:
@@ -1547,6 +1547,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if _torch_node == null:
 			_torch_node = _make_item_node("Torch", TORCH_TEX)
 			add_child(_torch_node)
+		_normalize_item_node(_torch_node, TORCH_TEX)
 		_torch_node.place(_torch_cell)
 		_torch_node.visible = true
 	else:
@@ -1940,6 +1941,7 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 	_torch_target_level = 1
 	if _torch_node and not _torch_collected:
 		_torch_cell = pick_cell.call()
+		_normalize_item_node(_torch_node, TORCH_TEX)
 		_torch_node.place(_torch_cell)
 	if _potion2_node:
 		_potion2_collected = false
@@ -2357,6 +2359,7 @@ func _apply_restored_items() -> void:
 			_ring_node.visible = false
 	if _torch_node:
 		if _level == _torch_target_level and not _torch_collected:
+			_normalize_item_node(_torch_node, TORCH_TEX)
 			_torch_node.place(_torch_cell)
 			_torch_node.visible = true
 		else:
@@ -2406,7 +2409,7 @@ func _apply_restored_items() -> void:
 	_apply_final_door_fx()
 
 func _save_level_state(level: int) -> void:
-	var state := {}
+	var state: Dictionary = {}
 	state["player_cell"] = Grid.world_to_cell(player.global_position)
 	state["key_on_level"] = _key_on_level
 	state["key_cell"] = _key_cell
@@ -3052,7 +3055,7 @@ func _try_give_cheese(cell: Vector2i) -> void:
 	_defense_level_bonus += 1
 	_play_sfx(SFX_PICKUP1)
 	_update_hud_icons()
-	_log_action("The mouse says \"Thank you!\" ( +1 ATK, +1 DEF)")
+	_log_action("The mouse says \"Thank you!\" (+1 ATK, +1 DEF)")
 
 func _enforce_melee_first_level_only() -> void:
 	if _level == 1:
@@ -3367,7 +3370,7 @@ func _clear_bones() -> void:
 
 func _place_bones(grid_size: Vector2i) -> void:
 	var count := _rng.randi_range(5, 30)
-	var used := {}
+	var used: Dictionary = {}
 	var player_cell := Grid.world_to_cell(player.global_position)
 	# Skeleton chance: starts at 15% and climbs 5% per level (and falls if level decreases)
 	var spawn_chance: float = clamp(0.15 + 0.05 * float(_level - 1), 0.15, 0.7)
@@ -3443,7 +3446,7 @@ func _place_spiderwebs(grid_size: Vector2i) -> void:
 		{ "name": &"bottom_left", "dirs": [Vector2i.DOWN, Vector2i.RIGHT] },
 		{ "name": &"bottom_right", "dirs": [Vector2i.DOWN, Vector2i.LEFT] },
 	]
-	var used := {}
+	var used: Dictionary = {}
 	var player_cell := Grid.world_to_cell(player.global_position)
 	for corner in corner_defs:
 		var candidates: Array[Vector2i] = []
@@ -4250,6 +4253,10 @@ func _set_level_item_textures() -> void:
 		b_s.z_index = 1
 	if _arrow_base_node and _arrow_base_node.get_node_or_null("Sprite2D") is Sprite2D:
 		(_arrow_base_node.get_node("Sprite2D") as Sprite2D).z_index = 1
+	if _torch_node and _torch_node.get_node_or_null("Sprite2D") is Sprite2D:
+		var t_s := _torch_node.get_node("Sprite2D") as Sprite2D
+		t_s.texture = TORCH_TEX if TORCH_TEX != null else t_s.texture
+		t_s.z_index = max(t_s.z_index, 1)
 	# HUD icons match the same textures
 	if _hud_icon_key1 and KEY_TEX_1:
 		_hud_icon_key1.texture = KEY_TEX_1
@@ -4344,7 +4351,7 @@ func _place_player(cell: Vector2i) -> void:
 		player.global_position = Grid.cell_to_world(cell)
 
 func _make_item_node(item_name: String, tex: Texture2D) -> Item:
-	var item := Item.new()
+	var item: Item = Item.new()
 	item.name = item_name
 	item.item_type = item_name
 	var s := Sprite2D.new()

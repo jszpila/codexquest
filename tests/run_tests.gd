@@ -1,6 +1,15 @@
 #!/usr/bin/env -S godot4 --headless --path . --script
 extends SceneTree
 
+class PickFreeFilter:
+	var target: Vector2i = Vector2i.ZERO
+
+	func is_free(cell: Vector2i) -> bool:
+		return cell == target
+
+	func has_free_neighbor(cell: Vector2i) -> bool:
+		return false
+
 # Lightweight test runner (no external deps). Run with:
 # godot4 --headless --path . --script res://tests/run_tests.gd
 
@@ -21,11 +30,13 @@ func _run() -> void:
 	_test_imp_miss_curve()
 	_test_game_over_cause_label()
 	_test_cheese_spawn_and_handin()
+	_test_torch_visibility_on_spawn()
+	_test_pick_free_interior_cell_respects_is_free()
 	if not _failures.is_empty():
 		for f in _failures:
 			printerr(f)
 	else:
-		print("All tests passed (%d)" % 10)
+		print("All tests passed (%d)" % 12)
 
 func _assert_true(cond: bool, msg: String) -> void:
 	if not cond:
@@ -214,3 +225,42 @@ func _test_cheese_spawn_and_handin() -> void:
 	mouse.queue_free()
 	main._mice.clear()
 	main.queue_free()
+
+func _test_torch_visibility_on_spawn() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	main.TORCH_TEX = ImageTexture.create_from_image(img)
+	main._torch_cell = Vector2i(2, 2)
+	main._torch_target_level = 1
+	main._level = 1
+	main._torch_collected = false
+	main._torch_node = main._make_item_node("Torch", main.TORCH_TEX)
+	main._apply_restored_items()
+	_assert_true(main._torch_node.visible, "Torch should be visible when on its target level and uncollected")
+	var sprite: Sprite2D = null
+	for child in main._torch_node.get_children():
+		if child is Sprite2D:
+			sprite = child
+			break
+	_assert_true(sprite != null, "Torch item should have a Sprite2D child")
+	if sprite != null:
+		_assert_eq(sprite.texture, main.TORCH_TEX, "Torch sprite should use the torch texture when spawned")
+		sprite.queue_free()
+	main._torch_node.queue_free()
+	main.queue_free()
+
+func _test_pick_free_interior_cell_respects_is_free() -> void:
+	var builder := LevelBuilder.new(RandomNumberGenerator.new())
+	var grid_size := Vector2i(6, 6)
+	var target_cell := Vector2i(3, 3)
+	var filter := PickFreeFilter.new()
+	filter.target = target_cell
+	var cell := builder.pick_free_interior_cell(
+		grid_size,
+		[],
+		Callable(filter, "is_free"),
+		Callable(filter, "has_free_neighbor")
+	)
+	_assert_eq(cell, target_cell, "pick_free_interior_cell should honor is_free even when fallback triggered")
+	builder = null
