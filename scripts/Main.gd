@@ -154,6 +154,7 @@ var _action_log: Array[String] = []
 @onready var walls_map: TileMap = $Walls
 @onready var player: Node2D = $Player
 @onready var _player_sprite: Sprite2D = $Player/Sprite2D
+@onready var _hud_layer: CanvasLayer = $HUD
 @onready var _hud_hearts: HBoxContainer = $HUD/HUDBar/HUDVitals/HeartsBorder/Hearts
 @onready var _hud_icon_key1: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDKey1Icon
 @onready var _hud_icon_key2: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDKey2Icon
@@ -647,6 +648,7 @@ func _process(_delta: float) -> void:
 		# Game over state; show overlay and wait for Enter to restart
 		if _state != STATE_GAME_OVER:
 			_state = STATE_GAME_OVER
+			_set_hud_layer_visible(false)
 			_show_game_over(_won)
 			_set_world_visible(false)
 		return
@@ -1805,6 +1807,11 @@ func _set_icon_visible(icon: Control, should_show: bool) -> void:
 	icon.visible = true
 	icon.modulate.a = (1.0 if should_show else 0.0)
 
+func _set_hud_layer_visible(visible: bool) -> void:
+	if _hud_layer == null:
+		return
+	_hud_layer.visible = visible
+
 func _init_action_log_labels() -> void:
 	_hud_action_lines.clear()
 	if _action_log_box == null:
@@ -2747,6 +2754,7 @@ func _start_game() -> void:
 	await get_tree().process_frame
 	# Reset flags/state
 	_state = STATE_PLAYING
+	_set_hud_layer_visible(true)
 	_is_transitioning = false
 	_game_over = false
 	_won = false
@@ -2839,6 +2847,7 @@ func _start_game() -> void:
 	# React to player movement for goblin AI
 	if player.has_signal("moved") and not player.moved.is_connected(_on_player_moved):
 		player.moved.connect(_on_player_moved)
+	_set_hud_layer_visible(true)
 	_play_sfx(SFX_START)
 	_hide_loading()
 
