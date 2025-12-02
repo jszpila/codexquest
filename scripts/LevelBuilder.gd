@@ -101,15 +101,19 @@ func pick_free_interior_cell(
 			pool.append(c)
 	if pool.is_empty() and require_neighbor:
 		return pick_free_interior_cell(grid_size, exclude, is_free, has_free_neighbor, false)
-	if pool.is_empty():
-		for y in range(1, grid_size.y - 1):
-			for x in range(1, grid_size.x - 1):
-				var c2 := Vector2i(x, y)
-				if exclude.has(c2):
-					continue
-				pool.append(c2)
-	if pool.is_empty():
-		return Vector2i(1, 1)
+		if pool.is_empty():
+			for y in range(1, grid_size.y - 1):
+				for x in range(1, grid_size.x - 1):
+					var c2 := Vector2i(x, y)
+					if exclude.has(c2):
+						continue
+					if not is_free.call(c2):
+						continue
+					pool.append(c2)
+			if pool.is_empty():
+				var fallback_x: int = clamp(int(grid_size.x / 2), 1, max(grid_size.x - 2, 1))
+				var fallback_y: int = clamp(int(grid_size.y / 2), 1, max(grid_size.y - 2, 1))
+				return Vector2i(fallback_x, fallback_y)
 	return pool[_rng.randi_range(0, pool.size() - 1)]
 
 func _randomize_floor_wall_transform(tm: TileMap, cell: Vector2i) -> void:
