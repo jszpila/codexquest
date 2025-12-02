@@ -1,5 +1,6 @@
 extends GutTest
 
+const GridUtilities: Script = preload("res://scripts/utils/GridUtilities.gd")
 var _main_script: Script = preload("res://scripts/Main.gd")
 var _goblin_script: Script = preload("res://scripts/Goblin.gd")
 var _trap_script: Script = preload("res://scripts/Trap.gd")
@@ -47,14 +48,12 @@ func test_enemy_registry_register_move_remove() -> void:
 	main.queue_free()
 
 func test_bresenham_line_continuity() -> void:
-	var main: Node = _fresh_main()
-	var pts: Array = main._bresenham(Vector2i.ZERO, Vector2i(3, 3))
+	var pts: Array = GridUtilities.bresenham(Vector2i.ZERO, Vector2i(3, 3))
 	assert_eq(pts.front(), Vector2i.ZERO, "Line should start at origin")
 	assert_eq(pts.back(), Vector2i(3, 3), "Line should end at destination")
 	for i in range(1, pts.size()):
 		var step: Vector2i = pts[i] - pts[i - 1]
 		assert_true(abs(step.x) <= 1 and abs(step.y) <= 1, "Line steps should move at most 1 per axis (idx=%d)" % i)
-	main.queue_free()
 
 func test_ranged_dir_combined_keys_produces_diagonal() -> void:
 	var main: Node = _fresh_main()
@@ -141,7 +140,7 @@ func test_minotaur_tints_on_damage() -> void:
 		return
 	var original := sprite.modulate
 	# Apply damage and ensure tint changes
-	var took_damage := mino.apply_damage(1)
+	var took_damage: bool = mino.apply_damage(1)
 	assert_true(took_damage == false, "First hit should not kill the minotaur")
 	assert_true(sprite.modulate != original, "Minotaur sprite should tint when damaged")
 	mino.queue_free()

@@ -1,5 +1,8 @@
 extends Node2D
 
+const GridUtilities: Script = preload("res://scripts/utils/GridUtilities.gd")
+const AssetManager: Script = preload("res://scripts/managers/AssetManager.gd")
+const EnemyManager: Script = preload("res://scripts/managers/EnemyManager.gd")
 const LevelBuilder: Script = preload("res://scripts/LevelBuilder.gd")
 const Enemy: Script = preload("res://scripts/Enemy.gd")
 const Goblin: Script = preload("res://scripts/Goblin.gd")
@@ -69,73 +72,145 @@ const ACTION_LOG_OPACITIES: Array[float] = [1.0, 0.8, 0.6, 0.4, 0.2]
 const ACTION_LOG_FONT_SIZE: int = 28
 const FINAL_DOOR_PULSE_SCALE: float = 0.06
 const FINAL_DOOR_PULSE_TIME: float = 0.6
-var PLAYER_TEX_1: Texture2D
-var PLAYER_TEX_2: Texture2D
-var PLAYER_TEX_3: Texture2D
-var PLAYER_TEX_4: Texture2D
-var PLAYER_TEX_WAND: Texture2D
-var PLAYER_TEX_BOW: Texture2D
-var PLAYER_TEX_TORCH: Texture2D
-var PLAYER_TEX_DEAD: Texture2D
-var HEART_TEX: Texture2D
-var GOBLIN_TEX_1: Texture2D
-var DEAD_GOBLIN_TEX: Texture2D
-var ZOMBIE_TEX_1: Texture2D
-var ZOMBIE_TEX_2: Texture2D
-var MINO_TEX_1: Texture2D
-var MINO_TEX_2: Texture2D
-var IMP_TEX: Texture2D
-var IMP_DEAD_TEX: Texture2D
-var SKELETON_TEX_1: Texture2D
-var SKELETON_TEX_2: Texture2D
-var DOOR_TEX_1: Texture2D
-var DOOR_TEX_2: Texture2D
-var DOOR_TEX_3: Texture2D
-var KEY_TEX_1: Texture2D
-var KEY_TEX_2: Texture2D
-var KEY_TEX_3: Texture2D
-var SWORD_TEX: Texture2D
-var SHIELD_TEX: Texture2D
-var ARMOR_TEX: Texture2D
-var POTION_TEX: Texture2D
-var CODEX_TEX: Texture2D
-var CROWN_TEX: Texture2D
-var RUNE1_TEX: Texture2D
-var RUNE2_TEX: Texture2D
-var RUNE3_TEX: Texture2D
-var RUNE4_TEX: Texture2D
-var TORCH_TEX: Texture2D
-var RING_TEX: Texture2D
-var CHEESE_TEX: Texture2D
-var ARMOR_ICON_TEX: Texture2D
-var TRAP_TEX_A: Texture2D
-var TRAP_TEX_B: Texture2D
-var TRAP_WEB_TEX: Texture2D
-var BRAZIER_TEX: Texture2D = null
-var WAND_TEX: Texture2D = null
-var BOW_TEX: Texture2D = null
-var ARROW_TEX: Texture2D = null
-var BONE_TEXTURES: Array[Texture2D] = []
-var SPIDERWEB_TEXTURES: Dictionary = {}
+# Asset management moved to AssetManager
+var _asset_manager: AssetManager
+var _enemy_manager: EnemyManager
 const BRAZIER_LIGHT_SIZE: int = 64
 var _brazier_light_texture: Texture2D
-var FLOOR_TEXTURES_A: Array[Texture2D] = []
-var FLOOR_TEXTURES_B: Array[Texture2D] = []
-var FLOOR_TEXTURES_C: Array[Texture2D] = []
-var FLOOR_TEXTURES_SHARED: Array[Texture2D] = []
-var WALL_TEXTURES_A: Array[Texture2D] = []
-var WALL_TEXTURES_B: Array[Texture2D] = []
-var WALL_TEXTURES_C: Array[Texture2D] = []
-var _floor_sources_by_set: Dictionary = {}
-var _wall_sources_by_set: Dictionary = {}
-var _shared_floor_sources: Array[int] = []
 var _current_floor_sources_base: Array[int] = []
 var _current_floor_sources: Array[int] = []
 var _current_wall_sources: Array[int] = []
 var _tileset_plan: Dictionary = {}
 var _tileset_choices: Array[StringName] = [TILESET_A, TILESET_B, TILESET_C]
-var _sheet_image: Image
-var _sheet_tex_cache: Dictionary = {}
+
+# Texture property getters - delegate to AssetManager for backward compatibility
+var PLAYER_TEX_1: Texture2D: get = _get_player_tex_1
+var PLAYER_TEX_2: Texture2D: get = _get_player_tex_2
+var PLAYER_TEX_3: Texture2D: get = _get_player_tex_3
+var PLAYER_TEX_4: Texture2D: get = _get_player_tex_4
+var PLAYER_TEX_WAND: Texture2D: get = _get_player_tex_wand
+var PLAYER_TEX_BOW: Texture2D: get = _get_player_tex_bow
+var PLAYER_TEX_TORCH: Texture2D: get = _get_player_tex_torch
+var PLAYER_TEX_DEAD: Texture2D: get = _get_player_tex_dead
+var HEART_TEX: Texture2D: get = _get_heart_tex
+var GOBLIN_TEX_1: Texture2D: get = _get_goblin_tex_1
+var DEAD_GOBLIN_TEX: Texture2D: get = _get_dead_goblin_tex
+var ZOMBIE_TEX_1: Texture2D: get = _get_zombie_tex_1
+var ZOMBIE_TEX_2: Texture2D: get = _get_zombie_tex_2
+var MINO_TEX_1: Texture2D: get = _get_mino_tex_1
+var MINO_TEX_2: Texture2D: get = _get_mino_tex_2
+var IMP_TEX: Texture2D: get = _get_imp_tex
+var IMP_DEAD_TEX: Texture2D: get = _get_imp_dead_tex
+var SKELETON_TEX_1: Texture2D: get = _get_skeleton_tex_1
+var SKELETON_TEX_2: Texture2D: get = _get_skeleton_tex_2
+var DOOR_TEX_1: Texture2D: get = _get_door_tex_1
+var DOOR_TEX_2: Texture2D: get = _get_door_tex_2
+var DOOR_TEX_3: Texture2D: get = _get_door_tex_3
+var KEY_TEX_1: Texture2D: get = _get_key_tex_1
+var KEY_TEX_2: Texture2D: get = _get_key_tex_2
+var KEY_TEX_3: Texture2D: get = _get_key_tex_3
+var SWORD_TEX: Texture2D: get = _get_sword_tex
+var SHIELD_TEX: Texture2D: get = _get_shield_tex
+var ARMOR_TEX: Texture2D: get = _get_armor_tex
+var POTION_TEX: Texture2D: get = _get_potion_tex
+var CODEX_TEX: Texture2D: get = _get_codex_tex
+var CROWN_TEX: Texture2D: get = _get_crown_tex
+var RUNE1_TEX: Texture2D: get = _get_rune1_tex
+var RUNE2_TEX: Texture2D: get = _get_rune2_tex
+var RUNE3_TEX: Texture2D: get = _get_rune3_tex
+var RUNE4_TEX: Texture2D: get = _get_rune4_tex
+var TORCH_TEX: Texture2D: get = _get_torch_tex
+var RING_TEX: Texture2D: get = _get_ring_tex
+var CHEESE_TEX: Texture2D: get = _get_cheese_tex
+var ARMOR_ICON_TEX: Texture2D: get = _get_armor_icon_tex
+var TRAP_TEX_A: Texture2D: get = _get_trap_tex_a
+var TRAP_TEX_B: Texture2D: get = _get_trap_tex_b
+var TRAP_WEB_TEX: Texture2D: get = _get_trap_web_tex
+var BRAZIER_TEX: Texture2D: get = _get_brazier_tex
+var WAND_TEX: Texture2D: get = _get_wand_tex
+var BOW_TEX: Texture2D: get = _get_bow_tex
+var ARROW_TEX: Texture2D: get = _get_arrow_tex
+var BONE_TEXTURES: Array[Texture2D]: get = _get_bone_textures
+var SPIDERWEB_TEXTURES: Dictionary: get = _get_spiderweb_textures
+var FLOOR_TEXTURES_A: Array[Texture2D]: get = _get_floor_textures_a
+var FLOOR_TEXTURES_B: Array[Texture2D]: get = _get_floor_textures_b
+var FLOOR_TEXTURES_C: Array[Texture2D]: get = _get_floor_textures_c
+var FLOOR_TEXTURES_SHARED: Array[Texture2D]: get = _get_floor_textures_shared
+var WALL_TEXTURES_A: Array[Texture2D]: get = _get_wall_textures_a
+var WALL_TEXTURES_B: Array[Texture2D]: get = _get_wall_textures_b
+var WALL_TEXTURES_C: Array[Texture2D]: get = _get_wall_textures_c
+var _title_textures: Array[Texture2D]: get = _get_title_textures
+var _win_textures: Array[Texture2D]: get = _get_win_textures
+var _lose_textures: Array[Texture2D]: get = _get_lose_textures
+
+# Property getter functions
+func _get_player_tex_1() -> Texture2D: return _asset_manager.PLAYER_TEX_1 if _asset_manager else null
+func _get_player_tex_2() -> Texture2D: return _asset_manager.PLAYER_TEX_2 if _asset_manager else null
+func _get_player_tex_3() -> Texture2D: return _asset_manager.PLAYER_TEX_3 if _asset_manager else null
+func _get_player_tex_4() -> Texture2D: return _asset_manager.PLAYER_TEX_4 if _asset_manager else null
+func _get_player_tex_wand() -> Texture2D: return _asset_manager.PLAYER_TEX_WAND if _asset_manager else null
+func _get_player_tex_bow() -> Texture2D: return _asset_manager.PLAYER_TEX_BOW if _asset_manager else null
+func _get_player_tex_torch() -> Texture2D: return _asset_manager.PLAYER_TEX_TORCH if _asset_manager else null
+func _get_player_tex_dead() -> Texture2D: return _asset_manager.PLAYER_TEX_DEAD if _asset_manager else null
+func _get_heart_tex() -> Texture2D: return _asset_manager.HEART_TEX if _asset_manager else null
+func _get_goblin_tex_1() -> Texture2D: return _asset_manager.GOBLIN_TEX_1 if _asset_manager else null
+func _get_dead_goblin_tex() -> Texture2D: return _asset_manager.DEAD_GOBLIN_TEX if _asset_manager else null
+func _get_zombie_tex_1() -> Texture2D: return _asset_manager.ZOMBIE_TEX_1 if _asset_manager else null
+func _get_zombie_tex_2() -> Texture2D: return _asset_manager.ZOMBIE_TEX_2 if _asset_manager else null
+func _get_mino_tex_1() -> Texture2D: return _asset_manager.MINO_TEX_1 if _asset_manager else null
+func _get_mino_tex_2() -> Texture2D: return _asset_manager.MINO_TEX_2 if _asset_manager else null
+func _get_imp_tex() -> Texture2D: return _asset_manager.IMP_TEX if _asset_manager else null
+func _get_imp_dead_tex() -> Texture2D: return _asset_manager.IMP_DEAD_TEX if _asset_manager else null
+func _get_skeleton_tex_1() -> Texture2D: return _asset_manager.SKELETON_TEX_1 if _asset_manager else null
+func _get_skeleton_tex_2() -> Texture2D: return _asset_manager.SKELETON_TEX_2 if _asset_manager else null
+func _get_door_tex_1() -> Texture2D: return _asset_manager.DOOR_TEX_1 if _asset_manager else null
+func _get_door_tex_2() -> Texture2D: return _asset_manager.DOOR_TEX_2 if _asset_manager else null
+func _get_door_tex_3() -> Texture2D: return _asset_manager.DOOR_TEX_3 if _asset_manager else null
+func _get_key_tex_1() -> Texture2D: return _asset_manager.KEY_TEX_1 if _asset_manager else null
+func _get_key_tex_2() -> Texture2D: return _asset_manager.KEY_TEX_2 if _asset_manager else null
+func _get_key_tex_3() -> Texture2D: return _asset_manager.KEY_TEX_3 if _asset_manager else null
+func _get_sword_tex() -> Texture2D: return _asset_manager.SWORD_TEX if _asset_manager else null
+func _get_shield_tex() -> Texture2D: return _asset_manager.SHIELD_TEX if _asset_manager else null
+func _get_armor_tex() -> Texture2D: return _asset_manager.ARMOR_TEX if _asset_manager else null
+func _get_potion_tex() -> Texture2D: return _asset_manager.POTION_TEX if _asset_manager else null
+func _get_codex_tex() -> Texture2D: return _asset_manager.CODEX_TEX if _asset_manager else null
+func _get_crown_tex() -> Texture2D: return _asset_manager.CROWN_TEX if _asset_manager else null
+func _get_rune1_tex() -> Texture2D: return _asset_manager.RUNE1_TEX if _asset_manager else null
+func _get_rune2_tex() -> Texture2D: return _asset_manager.RUNE2_TEX if _asset_manager else null
+func _get_rune3_tex() -> Texture2D: return _asset_manager.RUNE3_TEX if _asset_manager else null
+func _get_rune4_tex() -> Texture2D: return _asset_manager.RUNE4_TEX if _asset_manager else null
+func _get_torch_tex() -> Texture2D: return _asset_manager.TORCH_TEX if _asset_manager else null
+func _get_ring_tex() -> Texture2D: return _asset_manager.RING_TEX if _asset_manager else null
+func _get_cheese_tex() -> Texture2D: return _asset_manager.CHEESE_TEX if _asset_manager else null
+func _get_armor_icon_tex() -> Texture2D: return _asset_manager.ARMOR_ICON_TEX if _asset_manager else null
+func _get_trap_tex_a() -> Texture2D: return _asset_manager.TRAP_TEX_A if _asset_manager else null
+func _get_trap_tex_b() -> Texture2D: return _asset_manager.TRAP_TEX_B if _asset_manager else null
+func _get_trap_web_tex() -> Texture2D: return _asset_manager.TRAP_WEB_TEX if _asset_manager else null
+func _get_brazier_tex() -> Texture2D: return _asset_manager.BRAZIER_TEX if _asset_manager else null
+func _get_wand_tex() -> Texture2D: return _asset_manager.WAND_TEX if _asset_manager else null
+func _get_bow_tex() -> Texture2D: return _asset_manager.BOW_TEX if _asset_manager else null
+func _get_arrow_tex() -> Texture2D: return _asset_manager.ARROW_TEX if _asset_manager else null
+func _get_bone_textures() -> Array[Texture2D]: return _asset_manager.BONE_TEXTURES if _asset_manager else []
+func _get_spiderweb_textures() -> Dictionary: return _asset_manager.SPIDERWEB_TEXTURES if _asset_manager else {}
+func _get_floor_textures_a() -> Array[Texture2D]: return _asset_manager.FLOOR_TEXTURES_A if _asset_manager else []
+func _get_floor_textures_b() -> Array[Texture2D]: return _asset_manager.FLOOR_TEXTURES_B if _asset_manager else []
+func _get_floor_textures_c() -> Array[Texture2D]: return _asset_manager.FLOOR_TEXTURES_C if _asset_manager else []
+func _get_floor_textures_shared() -> Array[Texture2D]: return _asset_manager.FLOOR_TEXTURES_SHARED if _asset_manager else []
+func _get_wall_textures_a() -> Array[Texture2D]: return _asset_manager.WALL_TEXTURES_A if _asset_manager else []
+func _get_wall_textures_b() -> Array[Texture2D]: return _asset_manager.WALL_TEXTURES_B if _asset_manager else []
+func _get_wall_textures_c() -> Array[Texture2D]: return _asset_manager.WALL_TEXTURES_C if _asset_manager else []
+func _get_title_textures() -> Array[Texture2D]: return []  # Not exposed via getter, use get_random_title_texture
+func _get_win_textures() -> Array[Texture2D]: return []  # Not exposed via getter, use get_random_win_texture
+func _get_lose_textures() -> Array[Texture2D]: return []  # Not exposed via getter, use get_random_lose_texture
+
+func _get_title_texture() -> Texture2D:
+	return _asset_manager.get_random_title_texture() if _asset_manager else null
+
+func _get_win_texture() -> Texture2D:
+	return _asset_manager.get_random_win_texture() if _asset_manager else null
+
+func _get_lose_texture() -> Texture2D:
+	return _asset_manager.get_random_lose_texture() if _asset_manager else null
 var _ranged_highlight: StyleBoxFlat
 var _ranged_inactive: StyleBoxFlat
 var _debug_bow_outline: Line2D
@@ -144,9 +219,7 @@ var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
 var _dash_trail_pool: Array[Line2D] = []
 var _dash_trail_active: Array[Line2D] = []
-var _title_textures: Array[Texture2D] = []
-var _win_textures: Array[Texture2D] = []
-var _lose_textures: Array[Texture2D] = []
+# Title/win/lose textures moved to AssetManager
 var _audio_pool: Array[AudioStreamPlayer] = []
 var _debug_items: Array[Item] = []
 var _action_log: Array[String] = []
@@ -216,6 +289,9 @@ const ACTION_LOG_FONT: Font = preload("res://assets/m5x7.ttf")
 @export var level_fade_in_time: float = 0.5
 @export var level_fade_alpha: float = 0.95
 var _tileset: TileSet
+var _floor_sources_by_set: Dictionary = {}
+var _wall_sources_by_set: Dictionary = {}
+var _shared_floor_sources: Array[int] = []
 var _fov_overlay: Node2D
 var _fov_visible: Array[bool] = []
 var _fov_dist: Array[float] = []
@@ -224,234 +300,26 @@ var _fov_dirty: bool = false
 var _last_player_cell: Vector2i = Vector2i(-1, -1)
 var _cached_player_cell: Vector2i = Vector2i(-1, -1)
 
-func _sheet() -> Image:
-	if _sheet_image == null:
-		var tex: Texture2D = load(SPRITESHEET_PATH)
-		if tex == null:
-			push_error("Spritesheet not found at %s" % SPRITESHEET_PATH)
-			return Image.new()
-		_sheet_image = tex.get_image()
-	return _sheet_image
-
-func _sheet_tex(key: StringName, pos: Vector2i, mask_black: bool) -> Texture2D:
-	if _sheet_tex_cache.has(key):
-		return _sheet_tex_cache[key]
-	var region := Rect2i(pos + Vector2i.ONE, SHEET_SPRITE_SIZE)
-	var img := _sheet().get_region(region)
-	if mask_black:
-		img.convert(Image.FORMAT_RGBA8)
-		for y in range(img.get_height()):
-			for x in range(img.get_width()):
-				var c := img.get_pixel(x, y)
-				if c.r <= 0.01 and c.g <= 0.01 and c.b <= 0.01:
-					c.a = 0.0
-				img.set_pixel(x, y, c)
-	var tex := ImageTexture.create_from_image(img)
-	_sheet_tex_cache[key] = tex
-	return tex
-
-func _make_tile_source(tex: Texture2D) -> TileSetAtlasSource:
-	var src := TileSetAtlasSource.new()
-	src.texture = tex
-	src.texture_region_size = SHEET_SPRITE_SIZE
-	return src
-
-func _set_sprite_tex(node: Node, tex: Texture2D) -> void:
-	if node == null or tex == null:
-		return
-	var s := node.get_node_or_null("Sprite2D") as Sprite2D
-	if s:
-		s.texture = tex
-		s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		s.modulate = Color(1, 1, 1, 1)
-		s.visible = true
-		s.z_index = 50
-		s.z_as_relative = false
-		s.position = Vector2.ZERO
-
-func _normalize_item_node(item: Item, tex: Texture2D) -> void:
-	if item == null:
-		return
-	item.collected = false
-	item.visible = true
-	item.modulate = Color(1, 1, 1, 1)
-	item.z_index = 10
-	item.z_as_relative = false
-	item.global_position = Grid.cell_to_world(item.grid_cell)
-	_set_sprite_tex(item, tex)
-
+# Asset loading functions moved to AssetManager
 func _load_spritesheet_textures() -> void:
-	PLAYER_TEX_1 = _sheet_tex(&"player1", Vector2i(1352, 0), true)
-	PLAYER_TEX_2 = _sheet_tex(&"player2", Vector2i(1456, 0), true)
-	PLAYER_TEX_3 = _sheet_tex(&"player3", Vector2i(1937, 0), true)
-	PLAYER_TEX_4 = _sheet_tex(&"player4", Vector2i(1989, 0), true)
-	PLAYER_TEX_WAND = _sheet_tex(&"player_wand", Vector2i(1625, 0), true)
-	PLAYER_TEX_BOW = _sheet_tex(&"player_bow", Vector2i(2028, 0), true)
-	PLAYER_TEX_TORCH = _sheet_tex(&"player_torch", Vector2i(1898, 0), true)
-	PLAYER_TEX_DEAD = _sheet_tex(&"player_dead", Vector2i(2613, 0), true)
-	HEART_TEX = _sheet_tex(&"heart", Vector2i(1014, 481), true)
-	GOBLIN_TEX_1 = _sheet_tex(&"goblin1", Vector2i(1352, 52), true)
-	DEAD_GOBLIN_TEX = _sheet_tex(&"goblin_dead", Vector2i(2613, 52), true)
-	ZOMBIE_TEX_1 = _sheet_tex(&"zombie1", Vector2i(2626, 117), true)
-	ZOMBIE_TEX_2 = _sheet_tex(&"zombie2", Vector2i(2613, 117), true)
-	MINO_TEX_1 = _sheet_tex(&"mino1", Vector2i(1352, 208), true)
-	MINO_TEX_2 = _sheet_tex(&"mino2", Vector2i(2613, 208), true)
-	IMP_TEX = _sheet_tex(&"imp", Vector2i(2028, 260), true)
-	IMP_DEAD_TEX = _sheet_tex(&"imp_dead", Vector2i(2613, 260), true)
-	SKELETON_TEX_1 = _sheet_tex(&"skeleton1", Vector2i(1352, 130), true)
-	SKELETON_TEX_2 = _sheet_tex(&"skeleton_dead", Vector2i(2613, 130), true)
-	var mouse_tex := _sheet_tex(&"mouse", Vector2i(39, 182), true)
-	DOOR_TEX_1 = _sheet_tex(&"door1", Vector2i(156, 13), false)
-	DOOR_TEX_2 = _sheet_tex(&"door2", Vector2i(143, 13), false)
-	DOOR_TEX_3 = _sheet_tex(&"door3", Vector2i(260, 26), false)
-	KEY_TEX_1 = _sheet_tex(&"key1", Vector2i(117, 585), true)
-	KEY_TEX_2 = _sheet_tex(&"key2", Vector2i(13, 585), true)
-	KEY_TEX_3 = _sheet_tex(&"key3", Vector2i(39, 585), true)
-	SWORD_TEX = _sheet_tex(&"sword", Vector2i(351, 78), true)
-	SHIELD_TEX = _sheet_tex(&"shield", Vector2i(364, 156), true)
-	ARMOR_TEX = _sheet_tex(&"armor", Vector2i(351, 143), true)
-	POTION_TEX = _sheet_tex(&"potion", Vector2i(481, 52), true)
-	CODEX_TEX = _sheet_tex(&"codex", Vector2i(91, 481), true)
-	CROWN_TEX = _sheet_tex(&"crown", Vector2i(351, 299), true)
-	RUNE1_TEX = _sheet_tex(&"rune1", Vector2i(338, 221), true)
-	RUNE2_TEX = _sheet_tex(&"rune2", Vector2i(351, 221), true)
-	RUNE3_TEX = _sheet_tex(&"rune3", Vector2i(364, 221), true)
-	RUNE4_TEX = _sheet_tex(&"rune4", Vector2i(455, 221), true)
-	TORCH_TEX = _sheet_tex(&"torch", Vector2i(52, 546), true)
-	RING_TEX = _sheet_tex(&"ring", Vector2i(156, 559), true)
-	CHEESE_TEX = _sheet_tex(&"cheese", Vector2i(91, 221), true)
-	ARMOR_ICON_TEX = _sheet_tex(&"armor_icon", Vector2i(338, 156), true)
-	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
-	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
-	TRAP_WEB_TEX = _sheet_tex(&"trap_web", Vector2i(52, 507), true)
-	BRAZIER_TEX = _sheet_tex(&"brazier", Vector2i(351, 286), true)
-	WAND_TEX = _sheet_tex(&"wand", Vector2i(544, 169), true)
-	BOW_TEX = _sheet_tex(&"bow", Vector2i(351, 130), true)
-	ARROW_TEX = _sheet_tex(&"arrow", Vector2i(429, 130), true)
-	_title_textures = [
-		load("res://assets/CoB-title.png"),
-		load("res://assets/cob-title-mb.png"),
-		load("res://assets/cob-title-comic.png")
-	]
-	_win_textures = [
-		load("res://assets/codex-quest-win.png"),
-		load("res://assets/win-mb.png"),
-		load("res://assets/win-comic.png")
-	]
-	_lose_textures = [
-		load("res://assets/codex-quest-lose.png"),
-		load("res://assets/lose-mb.png"),
-		load("res://assets/lose-comic.png")
-	]
-	BONE_TEXTURES = [
-		_sheet_tex(&"bone1", Vector2i(0, 494), true),
-		_sheet_tex(&"bone2", Vector2i(13, 494), true),
-		_sheet_tex(&"bone3", Vector2i(26, 494), true),
-	]
-	SPIDERWEB_TEXTURES = {
-		&"top_left": _sheet_tex(&"spiderweb_top_left", Vector2i(0, 507), true),
-		&"top_right": _sheet_tex(&"spiderweb_top_right", Vector2i(13, 507), true),
-		&"bottom_left": _sheet_tex(&"spiderweb_bottom_left", Vector2i(26, 507), true),
-		&"bottom_right": _sheet_tex(&"spiderweb_bottom_right", Vector2i(39, 507), true),
-	}
-	FLOOR_TEXTURES_A = [
-		_sheet_tex(&"tile_set_a_floor_1", Vector2i(130, 65), false),
-		_sheet_tex(&"tile_set_a_floor_2", Vector2i(143, 65), false),
-		_sheet_tex(&"tile_set_a_floor_3", Vector2i(156, 65), false),
-		_sheet_tex(&"tile_set_a_floor_4", Vector2i(117, 65), false),
-	]
-	WALL_TEXTURES_A = [
-		_sheet_tex(&"tile_set_a_wall_1", Vector2i(0, 26), false),
-		_sheet_tex(&"tile_set_a_wall_2", Vector2i(13, 26), false),
-		_sheet_tex(&"tile_set_a_wall_3", Vector2i(65, 26), false),
-		_sheet_tex(&"tile_set_a_wall_4", Vector2i(78, 26), false),
-		_sheet_tex(&"tile_set_a_wall_5", Vector2i(91, 26), false),
-	]
-	FLOOR_TEXTURES_B = [
-		_sheet_tex(&"tile_set_b_floor_1", Vector2i(52, 65), false),
-		_sheet_tex(&"tile_set_b_floor_2", Vector2i(65, 65), false),
-		_sheet_tex(&"tile_set_b_floor_3", Vector2i(78, 65), false),
-		_sheet_tex(&"tile_set_b_floor_4", Vector2i(91, 65), false),
-	]
-	WALL_TEXTURES_B = [
-		_sheet_tex(&"tile_set_b_wall_1", Vector2i(39, 0), false),
-		_sheet_tex(&"tile_set_b_wall_2", Vector2i(52, 0), false),
-		_sheet_tex(&"tile_set_b_wall_3", Vector2i(65, 0), false),
-		_sheet_tex(&"tile_set_b_wall_4", Vector2i(78, 0), false),
-	]
-	FLOOR_TEXTURES_C = [
-		_sheet_tex(&"tile_set_c_floor_1", Vector2i(78, 78), false),
-		_sheet_tex(&"tile_set_c_floor_2", Vector2i(91, 78), false),
-		_sheet_tex(&"tile_set_c_floor_3", Vector2i(130, 78), false),
-		_sheet_tex(&"tile_set_c_floor_4", Vector2i(143, 78), false),
-	]
-	WALL_TEXTURES_C = [
-		_sheet_tex(&"tile_set_c_wall_1", Vector2i(0, 39), false),
-		_sheet_tex(&"tile_set_c_wall_2", Vector2i(13, 39), false),
-		_sheet_tex(&"tile_set_c_wall_3", Vector2i(26, 39), false),
-		_sheet_tex(&"tile_set_c_wall_4", Vector2i(156, 39), false),
-	]
-	FLOOR_TEXTURES_SHARED = [
-		_sheet_tex(&"old_bones_floor_1", Vector2i(0, 91), false),
-		_sheet_tex(&"old_bones_floor_2", Vector2i(13, 91), false),
-		_sheet_tex(&"old_bones_floor_3", Vector2i(26, 91), false),
-	]
-	_sheet_tex_cache[&"mouse_tex"] = mouse_tex
-	_set_sprite_tex(_door_node, DOOR_TEX_1)
-	_set_sprite_tex(_key_node, KEY_TEX_1)
-	_set_sprite_tex(_sword_node, SWORD_TEX)
-	_set_sprite_tex(_shield_node, SHIELD_TEX)
-	_set_sprite_tex(_potion_node, POTION_TEX)
-	_set_sprite_tex(_codex_node, CODEX_TEX)
-	_set_sprite_tex(_bow_node, BOW_TEX)
-	_set_sprite_tex(_wand_node, WAND_TEX)
-	_set_sprite_tex(_arrow_base_node, ARROW_TEX)
-	_set_sprite_tex(_player_sprite, PLAYER_TEX_1)
+	_asset_manager.load_all_textures()
+	# Set initial item textures
+	_asset_manager.set_sprite_texture(_door_node, _asset_manager.DOOR_TEX_1)
+	_asset_manager.set_sprite_texture(_key_node, _asset_manager.KEY_TEX_1)
+	_asset_manager.set_sprite_texture(_sword_node, _asset_manager.SWORD_TEX)
+	_asset_manager.set_sprite_texture(_shield_node, _asset_manager.SHIELD_TEX)
+	_asset_manager.set_sprite_texture(_potion_node, _asset_manager.POTION_TEX)
+	_asset_manager.set_sprite_texture(_codex_node, _asset_manager.CODEX_TEX)
+	_asset_manager.set_sprite_texture(_bow_node, _asset_manager.BOW_TEX)
+	_asset_manager.set_sprite_texture(_wand_node, _asset_manager.WAND_TEX)
+	_asset_manager.set_sprite_texture(_arrow_base_node, _asset_manager.ARROW_TEX)
+	_asset_manager.set_sprite_texture(_player_sprite, _asset_manager.PLAYER_TEX_1)
 
 func _build_tileset_from_sheet() -> void:
-	_tileset = TileSet.new()
-	_tileset.tile_size = Vector2i(12, 12)
-	_floor_sources_by_set.clear()
-	_wall_sources_by_set.clear()
-	_shared_floor_sources.clear()
-	var tilesets: Array = [
-		{
-			"id": TILESET_A,
-			"floors": FLOOR_TEXTURES_A,
-			"walls": WALL_TEXTURES_A
-		},
-		{
-			"id": TILESET_B,
-			"floors": FLOOR_TEXTURES_B,
-			"walls": WALL_TEXTURES_B
-		},
-		{
-			"id": TILESET_C,
-			"floors": FLOOR_TEXTURES_C,
-			"walls": WALL_TEXTURES_C
-		},
-	]
-	var next_source_id := 0
-	for ts in tilesets:
-		var floor_sources: Array[int] = []
-		for tex: Texture2D in ts["floors"]:
-			var src := _make_tile_source(tex)
-			_tileset.add_source(src, next_source_id)
-			floor_sources.append(next_source_id)
-			next_source_id += 1
-		_floor_sources_by_set[ts["id"]] = floor_sources
-		var wall_sources: Array[int] = []
-		for tex2: Texture2D in ts["walls"]:
-			var src2 := _make_tile_source(tex2)
-			_tileset.add_source(src2, next_source_id)
-			wall_sources.append(next_source_id)
-			next_source_id += 1
-		_wall_sources_by_set[ts["id"]] = wall_sources
-	for shared_tex in FLOOR_TEXTURES_SHARED:
-		var shared_src := _make_tile_source(shared_tex)
-		_tileset.add_source(shared_src, next_source_id)
-		_shared_floor_sources.append(next_source_id)
-		next_source_id += 1
+	_tileset = _asset_manager.build_tileset(TILESET_A, TILESET_B, TILESET_C)
+	_floor_sources_by_set = _asset_manager.get_floor_sources_by_set()
+	_wall_sources_by_set = _asset_manager.get_wall_sources_by_set()
+	_shared_floor_sources = _asset_manager.get_shared_floor_sources()
 	floor_map.tile_set = _tileset
 	walls_map.tile_set = _tileset
 
@@ -511,14 +379,6 @@ var _next_level_score: int = LEVEL_UP_SCORE_STEP
 var _attack_level_bonus: int = 0
 var _defense_level_bonus: int = 0
 var _carried_potion: bool = false
-var _goblins: Array[Goblin] = []
-var _zombies: Array[Zombie] = []
-var _minotaurs: Array[Minotaur] = []
-var _imps: Array[Imp] = []
-var _skeletons: Array[Skeleton] = []
-var _mice: Array[Mouse] = []
-var _traps: Array[Trap] = []
-var _enemy_map: Dictionary = {}
 var _potion2_node: Item
 var _arrow_nodes: Array[Item] = []
 var _armor_nodes: Array[Item] = []
@@ -574,6 +434,13 @@ const STATE_GAME_OVER: int = 2
 var _state: int = STATE_TITLE
 
 func _ready() -> void:
+	# Initialize asset manager
+	_asset_manager = AssetManager.new()
+	add_child(_asset_manager)
+	
+	# Initialize enemy manager
+	_enemy_manager = EnemyManager.new(self, _asset_manager)
+	add_child(_enemy_manager)
 	_setup_input()
 	_load_spritesheet_textures()
 	_build_tileset_from_sheet()
@@ -828,7 +695,7 @@ func _process(_delta: float) -> void:
 		_log_action("Picked up Ring")
 
 	if not _game_over:
-		var enemy: Enemy = _get_enemy_at(cp)
+		var enemy: Enemy = _enemy_manager.get_enemy_at(cp)
 		if enemy != null:
 			var force_resolve := enemy is Goblin
 			_combat_round_enemy(enemy, force_resolve)
@@ -905,9 +772,9 @@ func _process(_delta: float) -> void:
 func _on_player_moved(new_cell: Vector2i) -> void:
 	_cached_player_cell = new_cell
 	_fov_dirty = true
-	var skeleton_count_before := _skeletons.size()
+	var skeleton_count_before := _enemy_manager.get_skeletons().size()
 	_maybe_spawn_skeleton_from_bones(new_cell)
-	_advance_enemies_and_update(skeleton_count_before)
+	_enemy_manager.advance_enemies_and_update(skeleton_count_before)
 	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
 	_pickup_potion_if_available(new_cell)
 	_pickup_arrows_if_available(new_cell)
@@ -915,7 +782,7 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 func _on_player_attempt_move() -> bool:
 	if _web_stuck_turns > 0:
 		_web_stuck_turns = max(0, _web_stuck_turns - 1)
-		_advance_enemies_and_update(_skeletons.size())
+		_enemy_manager.advance_enemies_and_update(_enemy_manager.get_skeletons().size())
 		return false
 	return true
 
@@ -938,7 +805,7 @@ func _on_player_dash_attempt(dir: Vector2i) -> bool:
 		if not _in_interior(c) or _is_wall(c):
 			break
 		target_cell = c
-		var enemy := _get_enemy_at(c)
+		var enemy := _enemy_manager.get_enemy_at(c)
 		if enemy != null:
 			target = enemy
 			break
@@ -968,230 +835,9 @@ func _on_player_dash_attempt(dir: Vector2i) -> bool:
 	if landing_cell != origin:
 		_on_player_moved(landing_cell)
 	else:
-		_advance_enemies_and_update(_skeletons.size())
+		_enemy_manager.advance_enemies_and_update(_enemy_manager.get_skeletons().size())
 	return true
 
-func _enemy_can_act(enemy: Enemy) -> bool:
-	if enemy == null:
-		return false
-	if enemy.web_stuck_turns > 0:
-		enemy.web_stuck_turns = max(0, enemy.web_stuck_turns - 1)
-		return false
-	return true
-
-func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
-	var prev_dash_cd := _rune4_dash_cooldown
-	# 75% chance each goblin attempts to move 1 step in a random dir
-	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
-	for goblin: Goblin in _goblins:
-		if goblin.alive and _enemy_can_act(goblin) and _rng.randf() <= 0.75:
-			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
-			_move_goblin(goblin, d)
-	for mouse: Mouse in _mice:
-		if mouse.alive and _enemy_can_act(mouse) and _rng.randf() <= 0.75:
-			var d2: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
-			_move_mouse(mouse, d2)
-	# Move zombie (one per level) with low accuracy towards player, less accurate at distance
-	for zombie: Zombie in _zombies:
-		if zombie.alive and _enemy_can_act(zombie):
-			_move_homing_enemy(zombie)
-			_update_facing_to_player(zombie)
-	for i in range(_skeletons.size()):
-		var skeleton := _skeletons[i]
-		if i >= skip_skeletons_from:
-			continue
-		if skeleton.alive and _enemy_can_act(skeleton):
-			_move_homing_enemy(skeleton)
-	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
-	for mino: Minotaur in _minotaurs:
-		if mino.alive and _enemy_can_act(mino):
-			_move_homing_enemy(mino)
-	for imp: Imp in _imps:
-		if imp.alive and _enemy_can_act(imp):
-			_imp_take_turn(imp)
-	# Only update FOV if dirty (player moved or explicitly requested)
-	if _fov_dirty:
-		_update_fov()
-		_fov_dirty = false
-	if _rune4_dash_cooldown > 0:
-		_rune4_dash_cooldown = max(0, _rune4_dash_cooldown - 1)
-	if prev_dash_cd != _rune4_dash_cooldown:
-		_update_hud_icons()
-
-func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
-	var dest: Vector2i = goblin.grid_cell + dir
-	if not _can_enemy_step(dest, goblin):
-		return
-	var player_cell := Grid.world_to_cell(player.global_position)
-	# If goblin would move onto player, do one combat round and don't move into that cell
-	if dest == player_cell and goblin.alive and not _game_over:
-		_combat_round_enemy(goblin)
-		return
-	_set_enemy_cell(goblin, dest)
-	var trap := _trap_at(dest)
-	if trap != null:
-		_handle_enemy_hit_by_trap(goblin, trap)
-
-func _move_mouse(mouse: Mouse, dir: Vector2i) -> void:
-	var dest: Vector2i = mouse.grid_cell + dir
-	if not _in_interior(dest) or _is_wall(dest):
-		return
-	# avoid stacking on hostile enemies or other mice
-	if _get_enemy_at(dest) != null:
-		return
-	for m in _mice:
-		if m != mouse and m.alive and m.grid_cell == dest:
-			return
-	var trap := _trap_at(dest)
-	if trap != null:
-		# mice are immune
-		return
-	mouse.set_cell(dest)
-
-func _move_homing_enemy(enemy: Enemy) -> void:
-	var ecell := enemy.grid_cell
-	var player_cell := Grid.world_to_cell(player.global_position)
-	var delta: Vector2i = player_cell - ecell
-	var dist: int = abs(delta.x) + abs(delta.y)
-	# Determine desired direction towards player
-	var cand: Array[Vector2i] = []
-	if delta.x != 0:
-		cand.append(Vector2i(1 if delta.x > 0 else -1, 0))
-	if delta.y != 0:
-		cand.append(Vector2i(0, 1 if delta.y > 0 else -1))
-	# Accuracy: minotaur more accurate; zombie/skeleton less, and decreases with distance
-	var p_towards := 0.7
-	if enemy.enemy_type == &"zombie" or enemy.enemy_type == &"skeleton":
-		# Make zombies/skeletons track more aggressively, but still below minotaur accuracy
-		p_towards = clamp(0.88 - 0.035 * float(dist), 0.35, 0.9)
-	else:
-		p_towards = clamp(0.95 - 0.02 * float(dist), 0.5, 0.95)
-	var dir := Vector2i.ZERO
-	if _rng.randf() < p_towards and cand.size() > 0:
-		dir = cand[_rng.randi_range(0, cand.size() - 1)]
-	else:
-		# Pick a random direction; slight bias away from player
-		var dirs: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
-		dirs.shuffle()
-		for d in dirs:
-			var newd := ecell + d
-			if abs((player_cell - newd).x) + abs((player_cell - newd).y) > dist:
-				dir = d
-				break
-		if dir == Vector2i.ZERO:
-			dir = dirs[0]
-	var dest: Vector2i = ecell + dir
-	if not _can_enemy_step(dest, enemy):
-		return
-	# If moving onto player, do one combat round and don't step
-	if dest == player_cell and not _game_over:
-		var trap := _trap_at(dest)
-		if trap != null:
-			_handle_enemy_hit_by_trap(enemy, trap)
-			return
-		_combat_round_enemy(enemy)
-		return
-	# Move
-	_set_enemy_cell(enemy, dest)
-	var trap2 := _trap_at(dest)
-	if trap2 != null:
-		_handle_enemy_hit_by_trap(enemy, trap2)
-
-func _update_facing_to_player(enemy: Enemy) -> void:
-	if enemy == null:
-		return
-	var player_cell := Grid.world_to_cell(player.global_position)
-	var spr := enemy.get_node_or_null("Sprite2D") as Sprite2D
-	if spr == null:
-		return
-	spr.flip_h = player_cell.x > enemy.grid_cell.x
-
-func _move_enemy_away_from_player(enemy: Enemy) -> void:
-	var player_cell := Grid.world_to_cell(player.global_position)
-	var start_dist: int = abs(enemy.grid_cell.x - player_cell.x) + abs(enemy.grid_cell.y - player_cell.y)
-	var dirs: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
-	var best: Array[Vector2i] = []
-	var best_dist: int = start_dist
-	for d in dirs:
-		var dest := enemy.grid_cell + d
-		if not _can_enemy_step(dest, enemy):
-			continue
-		var trap := _trap_at(dest)
-		if trap != null:
-			# Running away: don't intentionally step into traps
-			continue
-		var dist: int = abs(dest.x - player_cell.x) + abs(dest.y - player_cell.y)
-		if dist > best_dist:
-			best_dist = dist
-			best = [dest]
-		elif dist == best_dist:
-			best.append(dest)
-	if best.is_empty():
-		_move_homing_enemy(enemy)
-		return
-	var pick := best[_rng.randi_range(0, best.size() - 1)]
-	_set_enemy_cell(enemy, pick)
-
-func _imp_targeting_data(origin: Vector2i, target: Vector2i) -> Dictionary:
-	var dx := target.x - origin.x
-	var dy := target.y - origin.y
-	var dist: int = max(abs(dx), abs(dy))
-	if dist < 1 or dist > 4:
-		return {}
-	var dir := Vector2i(sign(dx), sign(dy))
-	var aligned: bool = (dx == 0 or dy == 0 or abs(dx) == abs(dy))
-	if not aligned or dir == Vector2i.ZERO:
-		return {}
-	return {"dir": dir, "dist": dist}
-
-func _imp_line_clear(origin: Vector2i, dir: Vector2i, dist: int) -> bool:
-	for i in range(1, dist + 1):
-		var cell := origin + dir * i
-		if not _in_interior(cell):
-			return false
-		if _is_wall(cell):
-			return false
-		if i < dist:
-			if _get_enemy_at(cell) != null:
-				return false
-			if _trap_at(cell) != null:
-				return false
-	return true
-
-func _imp_miss_chance(dist: int) -> float:
-	return clampf(0.15 * float(max(0, dist - 1)), 0.0, 0.6)
-
-func _imp_fire_shot(imp: Imp, dir: Vector2i, dist: int, player_cell: Vector2i) -> void:
-	if imp == null or not imp.alive:
-		return
-	var origin := imp.grid_cell
-	var end_cell := origin + dir * dist
-	_fire_projectile(origin, end_cell, Color(0.9, 0.2, 0.2, 1))
-	imp.arrows = max(0, imp.arrows - 1)
-	imp.cooldown = 2
-	if _rng.randf() < _imp_miss_chance(dist):
-		_log_action("That was close!")
-		return
-	_set_death_cause_enemy(&"imp")
-	_apply_player_damage(1)
-	_log_action("Imp hits you!")
-
-func _imp_take_turn(imp: Imp) -> void:
-	if imp == null or not imp.alive:
-		return
-	imp.cooldown = max(0, imp.cooldown - 1)
-	var player_cell := Grid.world_to_cell(player.global_position)
-	var targeting := _imp_targeting_data(imp.grid_cell, player_cell)
-	if imp.arrows > 0 and imp.cooldown == 0 and not targeting.is_empty():
-		var dir: Vector2i = targeting["dir"]
-		var dist: int = targeting["dist"]
-		if _imp_line_clear(imp.grid_cell, dir, dist):
-			_imp_fire_shot(imp, dir, dist, player_cell)
-			return
-	if imp.arrows <= 0:
-		_move_enemy_away_from_player(imp)
-	else:
-		_move_homing_enemy(imp)
 
 func _get_grid_size() -> Vector2i:
 	# Use a fixed world size (in tiles)
@@ -1249,8 +895,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	var is_free := Callable(self, "_is_free")
 	var has_free_neighbor := Callable(self, "_has_free_neighbor")
 	_enforce_melee_first_level_only()
-	_clear_enemies()
-	_clear_mice()
+	_enemy_manager.clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
 	_clear_bones()
@@ -1281,7 +926,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			_key_collected = false
 			_key_cell = _level_builder.pick_free_interior_cell(grid_size, [player_cell], is_free, has_free_neighbor)
 			if _key_node:
-				_set_sprite_tex(_key_node, _key_texture_for_type(key_type))
+				_asset_manager.set_sprite_texture(_key_node, _key_texture_for_type(key_type))
 				_key_node.place(_key_cell)
 	else:
 		_key_cell = Vector2i(-1, -1)
@@ -1320,7 +965,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_wand_cell = _level_builder.pick_free_interior_cell(grid_size, wand_exclude, is_free, has_free_neighbor)
 		if _wand_node:
 			_wand_node.place(_wand_cell)
-			_normalize_item_node(_wand_node, WAND_TEX)
+			_asset_manager.normalize_item_node(_wand_node, WAND_TEX)
 			_ensure_ranged_pickups_ready()
 			_update_debug_ranged_outlines()
 	else:
@@ -1332,7 +977,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_bow_cell = _level_builder.pick_free_interior_cell(grid_size, bow_exclude, is_free, has_free_neighbor)
 		if _bow_node:
 			_bow_node.place(_bow_cell)
-			_normalize_item_node(_bow_node, BOW_TEX)
+			_asset_manager.normalize_item_node(_bow_node, BOW_TEX)
 			_ensure_ranged_pickups_ready()
 		_update_debug_ranged_outlines()
 	else:
@@ -1364,7 +1009,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			_potion2_node = _potion_node.duplicate() as Item
 			_potion2_node.name = "PotionExtra"
 			add_child(_potion2_node)
-			_set_sprite_tex(_potion2_node, POTION_TEX)
+			_asset_manager.set_sprite_texture(_potion2_node, POTION_TEX)
 		if _potion2_node != null:
 			_potion2_node.place(_potion2_cell)
 			_potion2_node.visible = true
@@ -1381,7 +1026,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		var cheese_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _potion2_cell, _wand_cell, _bow_cell]
 		_cheese_cell = _level_builder.pick_free_interior_cell(grid_size, cheese_exclude, is_free, has_free_neighbor)
 		_cheese_node.place(_cheese_cell)
-		_normalize_item_node(_cheese_node, CHEESE_TEX)
+		_asset_manager.normalize_item_node(_cheese_node, CHEESE_TEX)
 		_cheese_node.visible = true
 	else:
 		_cheese_cell = Vector2i(-1, -1)
@@ -1571,7 +1216,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if _torch_node == null:
 			_torch_node = _make_item_node("Torch", TORCH_TEX)
 			add_child(_torch_node)
-		_normalize_item_node(_torch_node, TORCH_TEX)
+		_asset_manager.normalize_item_node(_torch_node, TORCH_TEX)
 		_torch_node.place(_torch_cell)
 		_torch_node.visible = true
 	else:
@@ -1599,14 +1244,14 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			gcell = _level_builder.random_interior_cell(grid_size)
 			if gcell == player_cell or gcell == _key_cell:
 				continue
-			if _get_enemy_at(gcell) != null:
+			if _enemy_manager.get_enemy_at(gcell) != null:
 				continue
 			if not _is_free(gcell):
 				continue
 			if not _has_free_neighbor(gcell):
 				continue
 			break
-		_spawn_goblin_at(gcell)
+		_enemy_manager.spawn_goblin_at(gcell)
 
 	# Spawn zombies scaled modestly
 	var zombie_count: int = 1 + int((_level - 1) / 3)
@@ -1621,21 +1266,21 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			has_free_neighbor
 		)
 		zcells.append(zcell)
-		_spawn_zombie_at(zcell)
+		_enemy_manager.spawn_zombie_at(zcell)
 	# Spawn minotaurs scaled slowly
 	var mino_count: int = int(1 + (_level - 3) / 4) if _level >= 3 else 0
 	for i3 in range(mino_count):
 		var m_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
 		m_exclude.append_array(zcells)
 		var mcell := _level_builder.pick_free_interior_cell(grid_size, m_exclude, is_free, has_free_neighbor)
-		_spawn_minotaur_at(mcell)
+		_enemy_manager.spawn_minotaur_at(mcell)
 	# Spawn imps at about the same rate as minotaurs (ranged threat)
 	var imp_count: int = mino_count
 	for i_imp in range(imp_count):
 		var i_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
 		i_exclude.append_array(zcells)
 		var icell := _level_builder.pick_free_interior_cell(grid_size, i_exclude, is_free, has_free_neighbor)
-		_spawn_imp_at(icell)
+		_enemy_manager.spawn_imp_at(icell)
 	# Spawn 0-3 mice per level as non-hostile wanderers
 	var mice_count: int = _rng.randi_range(0, 3)
 	for i in range(mice_count):
@@ -1651,7 +1296,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			if _mouse_at(mcell2) != null:
 				continue
 			break
-		_spawn_mouse_at(mcell2)
+		_enemy_manager.spawn_mouse_at(mcell2)
 	# Spawn traps scaling with level
 	var traps_total: int = int(clamp(_rng.randi_range(0, 2) + (_level - 1), 0, 6))
 	for i in range(traps_total):
@@ -1675,7 +1320,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if not zcells.is_empty():
 			t_exclude.append(zcells[0])
 		var tcell := _level_builder.pick_free_interior_cell(grid_size, t_exclude, is_free, has_free_neighbor)
-		_spawn_trap_at(tcell)
+		_enemy_manager.spawn_trap_at(tcell)
 	_spawn_debug_items_level1(grid_size)
 
 func _restart_game() -> void:
@@ -1760,7 +1405,7 @@ func _restart_game() -> void:
 	_clear_braziers()
 	_clear_action_log()
 	_clear_corpses()
-	_clear_enemies()
+	_enemy_manager.clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
 	# Clear maps
@@ -1931,11 +1576,11 @@ func _ensure_ranged_pickups_ready() -> void:
 	if _wand_node:
 		_wand_node.collected = false if DEBUG_FORCE_RANGED else _wand_node.collected
 		if _wand_node.visible:
-			_set_sprite_tex(_wand_node, WAND_TEX)
+			_asset_manager.set_sprite_texture(_wand_node, WAND_TEX)
 	if _bow_node:
 		_bow_node.collected = false if DEBUG_FORCE_RANGED else _bow_node.collected
 		if _bow_node.visible:
-			_set_sprite_tex(_bow_node, BOW_TEX)
+			_asset_manager.set_sprite_texture(_bow_node, BOW_TEX)
 
 func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 	if not DEBUG_SPAWN_ALL_ITEMS or _level != 1:
@@ -1973,7 +1618,7 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 	_torch_target_level = 1
 	if _torch_node and not _torch_collected:
 		_torch_cell = pick_cell.call()
-		_normalize_item_node(_torch_node, TORCH_TEX)
+		_asset_manager.normalize_item_node(_torch_node, TORCH_TEX)
 		_torch_node.place(_torch_cell)
 	if _potion2_node:
 		_potion2_collected = false
@@ -1983,16 +1628,16 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 		_wand_level = 1
 		_wand_cell = pick_cell.call()
 		_wand_node.place(_wand_cell)
-		_normalize_item_node(_wand_node, WAND_TEX)
+		_asset_manager.normalize_item_node(_wand_node, WAND_TEX)
 	if _bow_node and not _bow_collected:
 		_bow_level = 1
 		_bow_cell = pick_cell.call()
 		_bow_node.place(_bow_cell)
-		_normalize_item_node(_bow_node, BOW_TEX)
+		_asset_manager.normalize_item_node(_bow_node, BOW_TEX)
 	if _ring_node and not _ring_collected:
 		_ring_cell = pick_cell.call()
 		_ring_node.place(_ring_cell)
-		_normalize_item_node(_ring_node, RING_TEX)
+		_asset_manager.normalize_item_node(_ring_node, RING_TEX)
 	if _rune1_nodes.is_empty():
 		var c1: Vector2i = pick_cell.call()
 		var n1: Item = _make_item_node("DebugRune1", RUNE1_TEX)
@@ -2087,7 +1732,7 @@ func _handle_enemy_death(enemy: Enemy) -> void:
 	if enemy == null:
 		return
 	enemy.visible = false
-	_remove_enemy_from_map(enemy)
+	_enemy_manager.remove_enemy_from_map(enemy)
 	_leave_enemy_corpse(enemy)
 	_play_sfx(SFX_HURT3)
 	_add_score(_enemy_score_value(enemy))
@@ -2391,7 +2036,7 @@ func _apply_restored_items() -> void:
 			_ring_node.visible = false
 	if _torch_node:
 		if _level == _torch_target_level and not _torch_collected:
-			_normalize_item_node(_torch_node, TORCH_TEX)
+			_asset_manager.normalize_item_node(_torch_node, TORCH_TEX)
 			_torch_node.place(_torch_cell)
 			_torch_node.visible = true
 		else:
@@ -2402,14 +2047,14 @@ func _apply_restored_items() -> void:
 	if _cheese_node:
 		if _level == _cheese_level and not _cheese_collected and not _cheese_given and _cheese_cell != Vector2i(-1, -1):
 			_cheese_node.place(_cheese_cell)
-			_normalize_item_node(_cheese_node, CHEESE_TEX)
+			_asset_manager.normalize_item_node(_cheese_node, CHEESE_TEX)
 			_cheese_node.visible = true
 		else:
 			_cheese_node.visible = false
 	if _wand_node:
 		if _level == _wand_level and not _wand_collected and _wand_cell != Vector2i(-1, -1):
 			_wand_node.place(_wand_cell)
-			_normalize_item_node(_wand_node, WAND_TEX)
+			_asset_manager.normalize_item_node(_wand_node, WAND_TEX)
 			_ensure_ranged_pickups_ready()
 			_update_debug_ranged_outlines()
 		else:
@@ -2417,7 +2062,7 @@ func _apply_restored_items() -> void:
 	if _bow_node:
 		if _level == _bow_level and not _bow_collected and _bow_cell != Vector2i(-1, -1):
 			_bow_node.place(_bow_cell)
-			_normalize_item_node(_bow_node, BOW_TEX)
+			_asset_manager.normalize_item_node(_bow_node, BOW_TEX)
 			_ensure_ranged_pickups_ready()
 			_update_debug_ranged_outlines()
 		else:
@@ -2498,26 +2143,26 @@ func _save_level_state(level: int) -> void:
 	state["key_on_level"] = _key_on_level
 	# Enemies/traps/mice
 	var enemies: Array = []
-	for g in _goblins:
+	for g in _enemy_manager.get_goblins():
 		enemies.append({
 			"type": "goblin",
 			"cell": g.grid_cell,
 			"alive": g.alive
 		})
-	for z in _zombies:
+	for z in _enemy_manager.get_zombies():
 		enemies.append({
 			"type": "zombie",
 			"cell": z.grid_cell,
 			"alive": z.alive
 		})
-	for m in _minotaurs:
+	for m in _enemy_manager.get_minotaurs():
 		enemies.append({
 			"type": "minotaur",
 			"cell": m.grid_cell,
 			"alive": m.alive,
 			"hp": m.hp
 		})
-	for imp in _imps:
+	for imp in _enemy_manager.get_imps():
 		enemies.append({
 			"type": "imp",
 			"cell": imp.grid_cell,
@@ -2526,7 +2171,7 @@ func _save_level_state(level: int) -> void:
 			"arrows": imp.arrows,
 			"cooldown": imp.cooldown
 		})
-	for sk in _skeletons:
+	for sk in _enemy_manager.get_skeletons():
 		enemies.append({
 			"type": "skeleton",
 			"cell": sk.grid_cell,
@@ -2534,10 +2179,10 @@ func _save_level_state(level: int) -> void:
 			"hp": sk.hp
 		})
 	var traps: Array = []
-	for t in _traps:
+	for t in _enemy_manager.get_traps():
 		traps.append({"cell": t.grid_cell, "type": t.trap_type})
 	var mice: Array = []
-	for m2 in _mice:
+	for m2 in _enemy_manager.get_mice():
 		mice.append({
 			"cell": m2.grid_cell,
 			"alive": m2.alive
@@ -2676,9 +2321,7 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 
 func _restore_entities_from_state(level: int) -> void:
 	var state: Dictionary = _level_states.get(level, {})
-	_clear_enemies()
-	_clear_mice()
-	_clear_traps()
+	_enemy_manager.clear_enemies()
 	_clear_corpses()
 	# Restore walls before entities if present
 	_restore_walls_from_state(state)
@@ -2689,59 +2332,59 @@ func _restore_entities_from_state(level: int) -> void:
 		var alive: bool = e.get("alive", true)
 		if etype == "goblin":
 			var gcell := cell
-			_spawn_goblin_at(gcell)
+			_enemy_manager.spawn_goblin_at(gcell)
 			if not alive:
-				_goblins.back().alive = false
-				_goblins.back().visible = false
-				_remove_enemy_from_map(_goblins.back())
+				_enemy_manager.get_goblins().back().alive = false
+				_enemy_manager.get_goblins().back().visible = false
+				_enemy_manager.remove_enemy_from_map(_enemy_manager.get_goblins().back())
 		elif etype == "zombie":
 			var zcell := cell
-			_spawn_zombie_at(zcell)
+			_enemy_manager.spawn_zombie_at(zcell)
 			if not alive:
-				_zombies.back().alive = false
-				_zombies.back().visible = false
-				_remove_enemy_from_map(_zombies.back())
+				_enemy_manager.get_zombies().back().alive = false
+				_enemy_manager.get_zombies().back().visible = false
+				_enemy_manager.remove_enemy_from_map(_enemy_manager.get_zombies().back())
 		elif etype == "minotaur":
 			var mcell := cell
-			_spawn_minotaur_at(mcell)
-			_minotaurs.back().hp = e.get("hp", _minotaurs.back().hp)
+			_enemy_manager.spawn_minotaur_at(mcell)
+			_enemy_manager.get_minotaurs().back().hp = e.get("hp", _enemy_manager.get_minotaurs().back().hp)
 			if not alive:
-				_minotaurs.back().alive = false
-				_minotaurs.back().visible = false
-				_remove_enemy_from_map(_minotaurs.back())
+				_enemy_manager.get_minotaurs().back().alive = false
+				_enemy_manager.get_minotaurs().back().visible = false
+				_enemy_manager.remove_enemy_from_map(_enemy_manager.get_minotaurs().back())
 		elif etype == "imp":
 			var icell := cell
-			_spawn_imp_at(icell)
-			_imps.back().hp = e.get("hp", _imps.back().hp)
-			_imps.back().arrows = e.get("arrows", _imps.back().arrows)
-			_imps.back().cooldown = e.get("cooldown", _imps.back().cooldown)
+			_enemy_manager.spawn_imp_at(icell)
+			_enemy_manager.get_imps().back().hp = e.get("hp", _enemy_manager.get_imps().back().hp)
+			_enemy_manager.get_imps().back().arrows = e.get("arrows", _enemy_manager.get_imps().back().arrows)
+			_enemy_manager.get_imps().back().cooldown = e.get("cooldown", _enemy_manager.get_imps().back().cooldown)
 			if not alive:
-				_imps.back().alive = false
-				_imps.back().visible = false
-				_remove_enemy_from_map(_imps.back())
+				_enemy_manager.get_imps().back().alive = false
+				_enemy_manager.get_imps().back().visible = false
+				_enemy_manager.remove_enemy_from_map(_enemy_manager.get_imps().back())
 		elif etype == "skeleton":
 			var skcell := cell
-			_spawn_skeleton_at(skcell)
-			_skeletons.back().hp = e.get("hp", _skeletons.back().hp)
+			_enemy_manager.spawn_skeleton_at(skcell)
+			_enemy_manager.get_skeletons().back().hp = e.get("hp", _enemy_manager.get_skeletons().back().hp)
 			if not alive:
-				_skeletons.back().alive = false
-				_skeletons.back().visible = false
-				_remove_enemy_from_map(_skeletons.back())
+				_enemy_manager.get_skeletons().back().alive = false
+				_enemy_manager.get_skeletons().back().visible = false
+				_enemy_manager.remove_enemy_from_map(_enemy_manager.get_skeletons().back())
 	var traps: Array = state.get("traps", [])
 	for t in traps:
 		var tcell: Vector2i = t.get("cell", Vector2i.ZERO)
 		var ttype: StringName = StringName(t.get("type", "spike"))
-		_spawn_trap_at(tcell, ttype)
+		_enemy_manager.spawn_trap_at(tcell, ttype)
 	_clear_braziers()
 	for bc in _brazier_cells:
 		_spawn_brazier(bc)
 	var mice: Array = state.get("mice", [])
 	for m in mice:
 		var mcell: Vector2i = m.get("cell", Vector2i.ZERO)
-		_spawn_mouse_at(mcell)
+		_enemy_manager.spawn_mouse_at(mcell)
 		if not m.get("alive", true):
-			_mice.back().alive = false
-			_mice.back().visible = false
+			_enemy_manager.get_mice().back().alive = false
+			_enemy_manager.get_mice().back().visible = false
 	var corpses: Array = state.get("corpses", [])
 	for c in corpses:
 		var tex: Texture2D = c.get("texture", null)
@@ -2839,7 +2482,7 @@ func _start_game() -> void:
 	_clear_debug_items()
 	_clear_action_log()
 	_update_hud_icons()
-	_clear_enemies()
+	_enemy_manager.clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
 	for anode in _arrow_nodes:
@@ -2883,8 +2526,8 @@ func _show_title(visible: bool) -> void:
 	_title_layer.visible = visible
 	_over_layer.visible = false
 	_hide_loading()
-	if visible and _title_bg and not _title_textures.is_empty():
-		var tex: Texture2D = _random_texture(_title_textures)
+	if visible and _title_bg:
+		var tex: Texture2D = _get_title_texture()
 		if tex:
 			_title_bg.texture = tex
 	_title_label.add_theme_font_size_override("font_size", 64)
@@ -2899,10 +2542,9 @@ func _show_game_over(won: bool) -> void:
 		_over_bg_lose.visible = not won
 	if _over_layer:
 		_over_layer.visible = true
-	var tex_arr := _win_textures if won else _lose_textures
 	var target_rect := _over_bg_win if won else _over_bg_lose
-	if target_rect and not tex_arr.is_empty():
-		var tex := _random_texture(tex_arr)
+	if target_rect:
+		var tex: Texture2D = _get_win_texture() if won else _get_lose_texture()
 		if tex:
 			target_rect.texture = tex
 	if _over_result:
@@ -2964,9 +2606,9 @@ func _death_cause_text() -> String:
 		return "Died of tetanus on Floor %d" % _level
 	if _last_death_cause != StringName():
 		return "Defeated at the hands of a %s on Floor %d" % [String(_last_death_cause), _level]
-	if _enemy_map.is_empty():
+	if _enemy_manager.is_enemy_map_empty():
 		return "Defeated at the hands of a monster on Floor %d" % _level
-	for e in _enemy_map.values():
+	for e in _enemy_manager.get_all_enemies():
 		if e is Enemy and e.alive:
 			return "Defeated at the hands of a %s on Floor %d" % [String(e.enemy_type), _level]
 	return "Defeated at the hands of a monster on Floor %d" % _level
@@ -3031,11 +2673,11 @@ func _set_world_visible(visible: bool) -> void:
 	if _wand_node:
 		_wand_node.visible = visible and (_level == _wand_level) and not _wand_collected
 		if _wand_node.visible:
-			_normalize_item_node(_wand_node, WAND_TEX)
+			_asset_manager.normalize_item_node(_wand_node, WAND_TEX)
 	if _bow_node:
 		_bow_node.visible = visible and (_level == _bow_level) and not _bow_collected
 		if _bow_node.visible:
-			_normalize_item_node(_bow_node, BOW_TEX)
+			_asset_manager.normalize_item_node(_bow_node, BOW_TEX)
 	for anode in _arrow_nodes:
 		if anode:
 			anode.visible = visible and not anode.collected and _arrow_cells.has(anode.grid_cell)
@@ -3055,19 +2697,19 @@ func _set_world_visible(visible: bool) -> void:
 		var st := _current_level_special_type()
 		var special_uncollected := (st == &"codex" and not _codex_collected) or (st == &"crown" and not _crown_collected)
 		_codex_node.visible = visible and special_uncollected
-	for g in _goblins:
+	for g in _enemy_manager.get_goblins():
 		g.visible = visible and g.alive
-	for z in _zombies:
+	for z in _enemy_manager.get_zombies():
 		z.visible = visible and z.alive
-	for m in _minotaurs:
+	for m in _enemy_manager.get_minotaurs():
 		m.visible = visible and m.alive
-	for sk in _skeletons:
+	for sk in _enemy_manager.get_skeletons():
 		sk.visible = visible and sk.alive
-	for imp in _imps:
+	for imp in _enemy_manager.get_imps():
 		imp.visible = visible and imp.alive
-	for t in _traps:
+	for t in _enemy_manager.get_traps():
 		t.visible = visible
-	for mouse in _mice:
+	for mouse in _enemy_manager.get_mice():
 		mouse.visible = visible and mouse.alive
 	_decor.visible = visible
 	for ditem in _debug_items:
@@ -3191,125 +2833,18 @@ func _apply_light_source(center: Vector2i, radius: int) -> void:
 				_fov_visible[idx] = true
 				_fov_dist[idx] = min(_fov_dist[idx], dist)
 
+# Grid utility functions moved to GridUtilities class
 func _in_bounds(cell: Vector2i) -> bool:
-	return cell.x >= 0 and cell.y >= 0 and cell.x < _grid_size.x and cell.y < _grid_size.y
+	return GridUtilities.is_in_bounds(cell, _grid_size)
 
 func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
-	var points: Array[Vector2i] = []
-	_bresenham_to_buffer(a, b, points)
-	return points
+	return GridUtilities.bresenham(a, b)
 
 func _bresenham_to_buffer(a: Vector2i, b: Vector2i, buffer: Array[Vector2i]) -> void:
-	buffer.clear()
-	var x0: int = a.x
-	var y0: int = a.y
-	var x1: int = b.x
-	var y1: int = b.y
-	var dx: int = abs(x1 - x0)
-	var sx: int = (1 if x0 < x1 else -1)
-	var dy: int = -abs(y1 - y0)
-	var sy: int = (1 if y0 < y1 else -1)
-	var err: int = dx + dy
-	while true:
-		buffer.append(Vector2i(x0, y0))
-		if x0 == x1 and y0 == y1:
-			break
-		var e2: int = 2 * err
-		if e2 >= dy:
-			err += dy
-			x0 += sx
-		if e2 <= dx:
-			err += dx
-			y0 += sy
+	GridUtilities.bresenham_to_buffer(a, b, buffer)
 
-func _spawn_goblin_at(cell: Vector2i) -> void:
-	var node: Goblin = GOBLIN_SCENE.instantiate() as Goblin
-	node.setup(cell, GOBLIN_TEX_1, DEAD_GOBLIN_TEX)
-	add_child(node)
-	_register_enemy(node)
-	_goblins.append(node)
 
-func _spawn_zombie_at(cell: Vector2i) -> void:
-	var node: Zombie = ZOMBIE_SCENE.instantiate() as Zombie
-	node.setup(cell, ZOMBIE_TEX_1, ZOMBIE_TEX_2)
-	add_child(node)
-	_register_enemy(node)
-	_zombies.append(node)
 
-func _spawn_minotaur_at(cell: Vector2i) -> void:
-	var node: Minotaur = MINOTAUR_SCENE.instantiate() as Minotaur
-	node.setup(cell, MINO_TEX_1, MINO_TEX_2)
-	add_child(node)
-	_register_enemy(node)
-	_minotaurs.append(node)
-
-func _spawn_imp_at(cell: Vector2i) -> void:
-	var node: Imp = IMP_SCENE.instantiate() as Imp
-	node.setup(cell, IMP_TEX, IMP_DEAD_TEX)
-	add_child(node)
-	_register_enemy(node)
-	_imps.append(node)
-
-func _spawn_mouse_at(cell: Vector2i) -> void:
-	var node: Mouse = MOUSE_SCENE.instantiate() as Mouse
-	var tex: Texture2D = _sheet_tex_cache.get(&"mouse_tex", null)
-	node.setup(cell, tex)
-	add_child(node)
-	_mice.append(node)
-
-func _spawn_trap_at(cell: Vector2i, trap_type: StringName = StringName()) -> void:
-	var node: Trap = TRAP_SCENE.instantiate() as Trap
-	var resolved_type := trap_type
-	if resolved_type == StringName():
-		var is_web := _rng.randf() < 0.33 and TRAP_WEB_TEX != null
-		resolved_type = (&"spiderweb" if is_web else &"spike")
-	var tex: Texture2D = null
-	if resolved_type == &"spiderweb":
-		tex = TRAP_WEB_TEX
-	else:
-		tex = (TRAP_TEX_A if _rng.randf() < 0.5 else TRAP_TEX_B)
-	node.setup(cell, tex, resolved_type)
-	add_child(node)
-	_traps.append(node)
-
-func _spawn_skeleton_at(cell: Vector2i) -> void:
-	var node: Skeleton = SKELETON_SCENE.instantiate() as Skeleton
-	node.setup(cell, SKELETON_TEX_1, SKELETON_TEX_2)
-	add_child(node)
-	_register_enemy(node)
-	_skeletons.append(node)
-	_log_action("AHHHHH!!!!")
-
-func _clear_enemies() -> void:
-	for child: Goblin in _goblins:
-		child.queue_free()
-	for child: Zombie in _zombies:
-		child.queue_free()
-	for child: Minotaur in _minotaurs:
-		child.queue_free()
-	for child: Imp in _imps:
-		child.queue_free()
-	for child: Skeleton in _skeletons:
-		child.queue_free()
-	_goblins.clear()
-	_zombies.clear()
-	_minotaurs.clear()
-	_imps.clear()
-	_skeletons.clear()
-	_enemy_map.clear()
-	_clear_mice()
-	_clear_traps()
-	_clear_corpses()
-
-func _clear_mice() -> void:
-	for m in _mice:
-		m.queue_free()
-	_mice.clear()
-
-func _clear_traps() -> void:
-	for t in _traps:
-		t.queue_free()
-	_traps.clear()
 
 func _clear_corpses() -> void:
 	for c in _corpse_nodes:
@@ -3383,13 +2918,13 @@ func _reset_items_visibility() -> void:
 		_wand_node.visible = (_level == _wand_level) and not _wand_collected
 		if _wand_node.visible:
 			_wand_node.collected = false
-			_set_sprite_tex(_wand_node, WAND_TEX)
+			_asset_manager.set_sprite_texture(_wand_node, WAND_TEX)
 	if _bow_node:
 		_bow_node.collected = _bow_collected
 		_bow_node.visible = (_level == _bow_level) and not _bow_collected
 		if _bow_node.visible:
 			_bow_node.collected = false
-			_set_sprite_tex(_bow_node, BOW_TEX)
+			_asset_manager.set_sprite_texture(_bow_node, BOW_TEX)
 	for r1 in _rune1_nodes:
 		if r1:
 			r1.collected = r1.collected
@@ -3450,7 +2985,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _rune4_cells.has(c) or _armor_cells.has(c) or _debug_cell_blocked(c):
 				continue
-			if _get_enemy_at(c) != null:
+			if _enemy_manager.get_enemy_at(c) != null:
 				continue
 			# Place a bones sprite
 			var s := Sprite2D.new()
@@ -3638,7 +3173,7 @@ func _maybe_spawn_skeleton_from_bones(cell: Vector2i) -> void:
 		return
 	var spawn_cell := options[_rng.randi_range(0, options.size() - 1)]
 	_play_sfx(SFX_MR_BONES)
-	_spawn_skeleton_at(spawn_cell)
+	_enemy_manager.spawn_skeleton_at(spawn_cell)
 
 func _place_entrance_marker(start_cell: Vector2i) -> void:
 	# Find a wall adjacent to the start cell and place a decorative door sprite there.
@@ -3773,7 +3308,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
 	_clear_corpses()
-	_clear_enemies()
+	_enemy_manager.clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
 	_clear_bones()
@@ -4097,7 +3632,7 @@ func _cast_wand(dir: Vector2i) -> void:
 			continue
 		if _is_wall(target):
 			continue
-		var enemy := _get_enemy_at(target)
+		var enemy := _enemy_manager.get_enemy_at(target)
 		if enemy != null:
 			hit = true
 			_blink_node(enemy)
@@ -4115,7 +3650,7 @@ func _cast_wand(dir: Vector2i) -> void:
 		_play_sfx(SFX_HURT1)
 		_play_sfx(SFX_PICKUP2)
 	_update_hud_icons()
-	_advance_enemies_and_update(_skeletons.size())
+	_enemy_manager.advance_enemies_and_update(_enemy_manager.get_skeletons().size())
 
 func _shoot_bow(dir: Vector2i) -> bool:
 	if not _bow_collected or _arrow_count <= 0:
@@ -4132,7 +3667,7 @@ func _shoot_bow(dir: Vector2i) -> bool:
 		if _is_wall(target):
 			path_end = origin + dir * (i - 1)
 			break
-		var enemy := _get_enemy_at(target)
+		var enemy := _enemy_manager.get_enemy_at(target)
 		if enemy != null:
 			path_end = target
 			if _bow_missed(origin, target):
@@ -4153,7 +3688,7 @@ func _shoot_bow(dir: Vector2i) -> bool:
 		path_end = target
 	_fire_projectile(origin, path_end, Color(1, 1, 1, 1))
 	_update_hud_icons()
-	_advance_enemies_and_update(_skeletons.size())
+	_enemy_manager.advance_enemies_and_update(_enemy_manager.get_skeletons().size())
 	return true
 
 func _bow_missed(origin: Vector2i, target: Vector2i) -> bool:
@@ -4260,7 +3795,7 @@ func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
 		return
 	if trap.trap_type == &"spiderweb":
 		_web_stuck_turns = _rng.randi_range(2, 5)
-		_traps.erase(trap)
+		_enemy_manager.get_traps().erase(trap)
 		trap.queue_free()
 		_last_trap_cell = Vector2i(-1, -1)
 		_log_action("Stuck in a spider web")
@@ -4275,14 +3810,14 @@ func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 	if trap.trap_type == &"spiderweb":
 		enemy.web_stuck_turns = max(enemy.web_stuck_turns, _rng.randi_range(2, 5))
 		_log_action("%s got stuck in a spider web" % String(enemy.enemy_type).capitalize())
-		_traps.erase(trap)
+		_enemy_manager.get_traps().erase(trap)
 		trap.queue_free()
 		return
 	enemy.apply_damage(1)
 	_log_action("%s stepped on a spike trap" % String(enemy.enemy_type).capitalize())
 	if not enemy.alive:
 		enemy.visible = false
-		_remove_enemy_from_map(enemy)
+		_enemy_manager.remove_enemy_from_map(enemy)
 		_leave_enemy_corpse(enemy)
 
 func _update_hud_hearts() -> void:
@@ -4430,14 +3965,14 @@ func is_cell_blocked(cell: Vector2i) -> bool:
 	return _brazier_cells.has(cell) or _debug_cell_blocked(cell)
 
 func is_in_bounds(cell: Vector2i) -> bool:
-	return _in_bounds(cell)
+	return GridUtilities.is_in_bounds(cell, _grid_size)
 
 func _place_random_inner_walls(grid_size: Vector2i) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)
 	var is_blocked := func(c: Vector2i) -> bool:
 		if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell:
 			return true
-		if _get_enemy_at(c) != null:
+		if _enemy_manager.get_enemy_at(c) != null:
 			return true
 		return false
 	_level_builder.place_random_inner_walls(grid_size, walls_map, _current_wall_sources, TILE_WALL, is_blocked)
@@ -4460,14 +3995,14 @@ func _is_wall(cell: Vector2i) -> bool:
 	return _wall_cache[idx]
 
 func _in_interior(cell: Vector2i) -> bool:
-	return cell.x >= 1 and cell.y >= 1 and cell.x < _grid_size.x - 1 and cell.y < _grid_size.y - 1
+	return GridUtilities.is_in_interior(cell, _grid_size)
 
 func _is_free(cell: Vector2i) -> bool:
 	if not _in_interior(cell) or _is_wall(cell):
 		return false
 	if is_cell_blocked(cell):
 		return false
-	if _get_enemy_at(cell) != null:
+	if _enemy_manager.get_enemy_at(cell) != null:
 		return false
 	if _trap_at(cell) != null:
 		return false
@@ -4478,7 +4013,7 @@ func _can_enemy_step(cell: Vector2i, mover: Enemy) -> bool:
 		return false
 	if is_cell_blocked(cell):
 		return false
-	var occupant := _get_enemy_at(cell)
+	var occupant := _enemy_manager.get_enemy_at(cell)
 	if occupant != null and occupant != mover:
 		return false
 	var mouse := _mouse_at(cell)
@@ -4697,41 +4232,21 @@ func _prepare_run_layout() -> void:
 	elif _rng.randf() < 0.5:
 		_cheese_level = _pick_weighted_early_level.call()
 
-func _register_enemy(enemy: Enemy) -> void:
-	if enemy == null:
-		return
-	_enemy_map[enemy.grid_cell] = enemy
-
-func _set_enemy_cell(enemy: Enemy, cell: Vector2i) -> void:
-	if enemy == null:
-		return
-	if _enemy_map.get(enemy.grid_cell, null) == enemy:
-		_enemy_map.erase(enemy.grid_cell)
-	enemy.set_cell(cell)
-	_enemy_map[cell] = enemy
-
-func _remove_enemy_from_map(enemy: Enemy) -> void:
-	if enemy == null:
-		return
-	if _enemy_map.get(enemy.grid_cell, null) == enemy:
-		_enemy_map.erase(enemy.grid_cell)
-		if enemy.enemy_type != StringName():
-			_last_death_cause = enemy.enemy_type
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
-	var enemy: Enemy = _enemy_map.get(cell, null)
+	var enemy: Enemy = _enemy_manager.get_enemy_at(cell)
 	if enemy != null and enemy.alive:
 		return enemy
 	return null
 
 func _mouse_at(cell: Vector2i) -> Mouse:
-	for m in _mice:
+	for m in _enemy_manager.get_mice():
 		if m.alive and m.grid_cell == cell:
 			return m
 	return null
 
 func _trap_at(cell: Vector2i) -> Trap:
-	for t in _traps:
+	for t in _enemy_manager.get_traps():
 		if t.grid_cell == cell:
 			return t
 	return null

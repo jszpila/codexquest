@@ -1,5 +1,6 @@
 extends GutTest
 
+const GridUtilities: Script = preload("res://scripts/utils/GridUtilities.gd")
 var _main_script: Script = preload("res://scripts/Main.gd")
 var _fov_overlay_script: Script = preload("res://scripts/FOVOverlay.gd")
 
@@ -132,37 +133,31 @@ func test_player_cell_cached_on_placement() -> void:
 	main.queue_free()
 
 func test_bresenham_to_buffer_reuses_buffer() -> void:
-	var main: Node = _fresh_main()
 	var buffer: Array[Vector2i] = []
 	
 	# First call
-	main._bresenham_to_buffer(Vector2i(0, 0), Vector2i(2, 2), buffer)
+	GridUtilities.bresenham_to_buffer(Vector2i(0, 0), Vector2i(2, 2), buffer)
 	var first_size := buffer.size()
 	assert_true(first_size > 0, "Buffer should contain points")
 	
 	# Second call with different line
 	buffer.clear()
-	main._bresenham_to_buffer(Vector2i(1, 1), Vector2i(3, 3), buffer)
+	GridUtilities.bresenham_to_buffer(Vector2i(1, 1), Vector2i(3, 3), buffer)
 	var second_size := buffer.size()
 	assert_eq(second_size, first_size, "Buffer should be reusable")
 	assert_eq(buffer.front(), Vector2i(1, 1), "Buffer should contain new line points")
-	
-	main.queue_free()
 
 func test_bresenham_and_bresenham_to_buffer_equivalent() -> void:
-	var main: Node = _fresh_main()
 	var a := Vector2i(0, 0)
 	var b := Vector2i(5, 3)
 	
-	var points1: Array[Vector2i] = main._bresenham(a, b)
+	var points1: Array[Vector2i] = GridUtilities.bresenham(a, b)
 	var buffer: Array[Vector2i] = []
-	main._bresenham_to_buffer(a, b, buffer)
+	GridUtilities.bresenham_to_buffer(a, b, buffer)
 	
 	assert_eq(points1.size(), buffer.size(), "Both methods should produce same number of points")
 	assert_eq(points1.front(), buffer.front(), "Both should start at same point")
 	assert_eq(points1.back(), buffer.back(), "Both should end at same point")
-	
-	main.queue_free()
 
 func test_fov_overlay_excludes_walls_from_darkening() -> void:
 	var fov: Node2D = _fov_overlay_script.new() as Node2D
